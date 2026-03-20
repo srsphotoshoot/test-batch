@@ -1,0 +1,33 @@
+# Environment configuration
+.env
+.env.dev
+.env.prod
+
+# Virtual Environments
+venv/
+env/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database and Logs
+batches.db
+*.sqlite3
+*.log
+api.log
+
+# Mac OS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+# Custom temporary testing scripts
+test*.py
+wait*.py
+inspect_genai.py
+docker*
+
