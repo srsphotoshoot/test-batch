@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import './LoginSignup.css';
 
 // Use proxy configured in package.json, or fallback to localhost
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? '' 
-  : (process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000');
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
 
 function LoginSignup({ onLoginSuccess }) {
   const [isSignup, setIsSignup] = useState(false);
