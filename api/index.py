@@ -924,7 +924,8 @@ async def delete_batch(batch_id: str):
 # ==================================================
 # FRONTEND STATIC SERVING
 # ==================================================
-frontend_build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "build")
+# The frontend/build directory is in the project root
+frontend_build_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "build")
 
 if os.path.exists(frontend_build_path):
     app.mount("/static", StaticFiles(directory=os.path.join(frontend_build_path, "static")), name="static")

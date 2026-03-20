@@ -26,8 +26,8 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 DEBUG = ENVIRONMENT == "dev"
 
 # API Configuration
-FASTAPI_HOST = os.getenv("FASTAPI_HOST", "localhost")
-FASTAPI_PORT = int(os.getenv("FASTAPI_PORT", "8000"))
+FASTAPI_HOST = os.getenv("FASTAPI_HOST", "0.0.0.0")
+FASTAPI_PORT = int(os.getenv("PORT", os.getenv("FASTAPI_PORT", "8000")))
 FASTAPI_BASE_URL = os.getenv("FASTAPI_BASE_URL", f"http://{FASTAPI_HOST}:{FASTAPI_PORT}")
 
 # Gemini Configuration (FastAPI only)
