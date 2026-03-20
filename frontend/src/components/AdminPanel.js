@@ -21,19 +21,20 @@ function AdminPanel({ token }) {
     loadAllData();
     const interval = setInterval(loadAllData, 10000); // Refresh every 10 seconds
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const loadAllData = async () => {
     setLoading(true);
     setError('');
-    
+
     try {
       // Load system health
       await loadSystemHealth();
-      
+
       // Load queue info
       await loadQueueInfo();
-      
+
       // Load stats only if admin
       if (token) {
         await loadStats();
@@ -153,7 +154,7 @@ function AdminPanel({ token }) {
 
   const rotateSignupCode = async () => {
     if (!window.confirm('Generate a new signup code? New users will need the new code.')) return;
-    
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/signup-code/rotate`, {
         method: 'POST',
@@ -173,7 +174,7 @@ function AdminPanel({ token }) {
   const updateUserLimits = async (userId, limitChange) => {
     const user = users.find(u => u.id === userId);
     if (!user) return;
-    
+
     const newLimit = (user.batch_limit || 50) + limitChange;
     if (newLimit < 0) return;
 
@@ -239,31 +240,31 @@ function AdminPanel({ token }) {
       <div className="admin-header">
         <h1>🔧 Admin Dashboard</h1>
         <div className="admin-controls">
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`}
             onClick={() => setActiveTab('stats')}
           >
             📊 Statistics
           </button>
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'uploads' ? 'active' : ''}`}
             onClick={() => setActiveTab('uploads')}
           >
             📤 Uploads
           </button>
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'batches' ? 'active' : ''}`}
             onClick={() => setActiveTab('batches')}
           >
             📋 All Batches
           </button>
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
             onClick={() => setActiveTab('users')}
           >
             👥 Users
           </button>
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'system' ? 'active' : ''}`}
             onClick={() => setActiveTab('system')}
           >
@@ -319,7 +320,7 @@ function AdminPanel({ token }) {
               🗑️ Clear Cache
             </button>
           </div>
-          
+
           <div className="upload-stats-grid">
             <div className="stat-card">
               <div className="stat-label">Total Uploads</div>
@@ -414,8 +415,8 @@ function AdminPanel({ token }) {
                 <div className="col-email">
                   <div className="user-email">{user.email}</div>
                   <div className="user-name">
-                    {user.first_name || user.last_name ? 
-                      `👤 ${user.first_name || ''} ${user.last_name || ''}` : 
+                    {user.first_name || user.last_name ?
+                      `👤 ${user.first_name || ''} ${user.last_name || ''}` :
                       'Unnamed User'}
                   </div>
                 </div>
@@ -441,7 +442,7 @@ function AdminPanel({ token }) {
                   </span>
                 </div>
                 <div className="col-actions">
-                  <button 
+                  <button
                     className="btn btn-sm btn-danger"
                     onClick={() => deleteUser(user.id)}
                   >
@@ -464,7 +465,7 @@ function AdminPanel({ token }) {
               <p>API Server: <strong>Running</strong></p>
               <p>Database: <strong>{systemHealth.database || 'Connected'}</strong></p>
               <p>Gemini API: <strong>{systemHealth.gemini || 'Ready'}</strong></p>
-              
+
               <div className="signup-code-box">
                 <h4>🔑 Current Signup Code</h4>
                 <div className="code-display">

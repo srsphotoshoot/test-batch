@@ -5,7 +5,6 @@ import BatchDetail from './components/BatchDetail';
 import CreateBatch from './components/CreateBatch';
 import BubbleBackground from './components/BubbleBackground';
 import QueueDashboard from './components/QueueDashboard';
-import Sidebar from './components/Sidebar';
 import LoginSignup from './components/LoginSignup';
 import AdminPanel from './components/AdminPanel';
 
@@ -21,7 +20,6 @@ function App() {
 
   const [selectedBatchId, setSelectedBatchId] = useState(null);
   const [batches, setBatches] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState(null);
   const [queueStatus, setQueueStatus] = useState({ queued: 0, generating: 0 });
   const [token, setToken] = useState(() => localStorage.getItem('token'));
@@ -45,6 +43,7 @@ function App() {
     }, 5000);
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentView, token]);
 
   const loadQueueStatus = async () => {
