@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import bcrypt
 import jwt
-from config import JWT_SECRET_KEY
+from config import JWT_SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, SIGNUP_PASSKEY
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "batches.db")
 
@@ -92,17 +92,35 @@ def init_db():
             # Ensure at least one active signup code exists
             active_code = conn.execute("SELECT code FROM signup_codes WHERE is_active = 1 LIMIT 1").fetchone()
             if not active_code:
-                import random
-                import string
-                initial_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                # Use environment SIGNUP_PASSKEY if available, otherwise random
+                initial_code = SIGNUP_PASSKEY if SIGNUP_PASSKEY else ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
                 conn.execute(
                     "INSERT INTO signup_codes (code, is_active, created_at) VALUES (?, ?, ?)",
                     (initial_code, 1, datetime.utcnow().isoformat())
                 )
+            elif SIGNUP_PASSKEY:
+                # If SIGNUP_PASSKEY is provided, ensure it's also an active code
+                existing = conn.execute("SELECT id FROM signup_codes WHERE code = ?", (SIGNUP_PASSKEY,)).fetchone()
+                if not existing:
+                    conn.execute(
+                        "INSERT INTO signup_codes (code, is_active, created_at) VALUES (?, ?, ?)",
+                        (SIGNUP_PASSKEY, 1, datetime.utcnow().isoformat())
+                    )
+
+            # Ensure initial admin user exists
+            admin_user = conn.execute("SELECT id FROM users WHERE role = 'admin' LIMIT 1").fetchone()
+            if not admin_user and ADMIN_EMAIL and ADMIN_PASSWORD:
+                hashed_pw = bcrypt.hashpw(ADMIN_PASSWORD.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                conn.execute(
+                    "INSERT INTO users (email, password, first_name, last_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (ADMIN_EMAIL, hashed_pw, "Admin", "User", "admin", datetime.utcnow().isoformat())
+                )
+                print(f"✅ Initial admin user created: {ADMIN_EMAIL}")
 
             conn.commit()
-        except Exception:
+        except Exception as e:
             # If pragma fails (e.g., empty DB), ignore and continue
+            print(f"⚠️  Database migration/init warning: {str(e)}")
             pass
     finally:
         conn.close()

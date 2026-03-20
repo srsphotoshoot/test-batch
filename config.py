@@ -49,6 +49,10 @@ if not JWT_SECRET_KEY:
     import sys
     print("⚠️  WARNING: JWT_SECRET_KEY environment variable not set!", file=sys.stderr)
 
+# Admin Configuration
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@srs.ai")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "srsadmin123")
+
 # Image Configuration
 MAX_IMAGE_DIM = 2048
 TARGET_SIZE_MIN = 1 * 1024 * 1024
