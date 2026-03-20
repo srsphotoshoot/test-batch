@@ -4,9 +4,9 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "cd frontend && npm install && npm run build && cd .. && pip install -r requirements.txt && python api/index.py",
+    "startCommand": "uvicorn api.index:app --host 0.0.0.0 --port $PORT",
     "restartPolicyType": "ON_FAILURE",
-    "healthCheckPath": "/health",
-    "healthCheckTimeout": 60
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 60
   }
 }
