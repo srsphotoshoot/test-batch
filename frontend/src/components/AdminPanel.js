@@ -157,6 +157,20 @@ function AdminPanel({ token }) {
     }
   };
 
+  const loadSignupCode = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/signup-code`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSignupCode(data.code || '');
+      }
+    } catch (err) {
+      console.error('Error loading signup code:', err);
+    }
+  };
+
   const loadDbConfig = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/db/config`, {
@@ -241,6 +255,65 @@ function AdminPanel({ token }) {
       }
     } catch (err) {
       setError('Error importing database: ' + err.message);
+    }
+  };
+
+  const updateUserLimits = async (userId, delta) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/limits`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ delta })
+      });
+      if (res.ok) {
+        await loadUsers();
+      } else {
+        setError('Failed to update user limits');
+      }
+    } catch (err) {
+      setError('Error updating limits: ' + err.message);
+    }
+  };
+
+  const deleteUser = async (userId) => {
+    if (!window.confirm('Delete this user permanently? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setSuccess('User deleted successfully');
+        await loadUsers();
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError('Failed to delete user');
+      }
+    } catch (err) {
+      setError('Error deleting user: ' + err.message);
+    }
+  };
+
+  const rotateSignupCode = async () => {
+    if (!window.confirm('Rotate the signup code? The old code will stop working.')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/signup-code/rotate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSignupCode(data.code || '');
+        setSuccess('Signup code rotated successfully');
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError('Failed to rotate signup code');
+      }
+    } catch (err) {
+      setError('Error rotating code: ' + err.message);
     }
   };
 

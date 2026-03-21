@@ -2,26 +2,15 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/index.py",
-      "use": "@vercel/python"
-    },
-    {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": { "distDir": "build" }
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/(api|login|signup|health|docs|openapi.json)(.*)",
-      "destination": "api/index.py"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "frontend/$1"
+      "src": "/(.*)",
+      "dest": "/frontend/$1"
     }
-  ],
-  "env": {
-    "PYTHONPATH": "."
-  }
+  ]
 }
