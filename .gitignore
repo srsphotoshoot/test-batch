@@ -17,6 +17,7 @@ batches.db
 *.sqlite3
 *.log
 api.log
+db_config.json
 
 # Mac OS
 .DS_Store
