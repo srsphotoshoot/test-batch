@@ -112,6 +112,9 @@ function LoginSignup({ onLoginSuccess }) {
   return (
     <div className="login-signup-container">
       <div className="login-signup-box">
+        <div className="login-logo">
+          <img src="/2.png" alt="SRS Logo" />
+        </div>
         <h2>{isSignup ? '📝 Sign Up' : '🔐 Login'}</h2>
 
         {error && <div className="error-message">{error}</div>}

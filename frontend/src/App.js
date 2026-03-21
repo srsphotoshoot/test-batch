@@ -144,6 +144,7 @@ function App() {
       {/* Navigation Bar */}
       <nav className="navbar">
         <div className="navbar-brand">
+          <img src="/2.png" alt="SRS Logo" className="navbar-logo" />
           <h1>🎨 SRS Batch Mode</h1>
         </div>
 

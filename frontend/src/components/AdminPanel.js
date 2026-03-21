@@ -238,7 +238,10 @@ function AdminPanel({ token }) {
   return (
     <div className="admin-panel">
       <div className="admin-header">
-        <h1>🔧 Admin Dashboard</h1>
+        <div className="admin-brand">
+          <img src="/2.png" alt="SRS Logo" className="admin-logo" />
+          <h1>🔧 Admin Dashboard</h1>
+        </div>
         <div className="admin-controls">
           <button
             className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`}

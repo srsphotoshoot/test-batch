@@ -6,7 +6,7 @@ const Sidebar = ({ setCurrentView }) => {
     <div className="sidebar">
 
       <div className="logo">
-        SRS AI
+        <img src="/2.png" alt="SRS Logo" className="sidebar-logo" />
       </div>
 
       <nav>
