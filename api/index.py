@@ -523,29 +523,97 @@ async def get_upload_stats(current_user: Dict = Depends(verify_token)):
         )
 
 
-@app.post("/api/admin/clear-cache")
-async def clear_upload_cache(current_user: Dict = Depends(verify_token)):
-    """Clear upload cache - Admin only"""
-    
+@app.get("/api/admin/db/config")
+async def get_db_config(current_user: Dict = Depends(verify_token)):
     if current_user.get("role") != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Admin access required"
-        )
+        raise HTTPException(status_code=403, detail="Admin access required")
     
+    import db_engine
+    return {
+        "status": "success",
+        "current_url": db_engine.get_db_url(),
+        "config_file_exists": os.path.exists(db_engine.CONFIG_PATH)
+    }
+
+@app.post("/api/admin/db/test")
+async def test_db_connection(data: Dict, current_user: Dict = Depends(verify_token)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    url = data.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="Database URL required")
+    
+    from sqlalchemy import create_engine
     try:
-        # Clear any temporary upload files
-        logger.info("🗑️ Clearing upload cache...")
-        return {
-            "status": "success",
-            "message": "Upload cache cleared successfully"
-        }
+        # Adjust postgres:// to postgresql:// if needed
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+            
+        test_engine = create_engine(url, connect_args={"connect_timeout": 5})
+        with test_engine.connect() as conn:
+            return {"status": "success", "message": "Connection successful!"}
     except Exception as e:
-        logger.error(f"Error clearing cache: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to clear cache"
-        )
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/admin/db/save")
+async def save_db_config(data: Dict, current_user: Dict = Depends(verify_token)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    url = data.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="Database URL required")
+    
+    import db_engine
+    try:
+        with open(db_engine.CONFIG_PATH, "w") as f:
+            json.dump({"DATABASE_URL": url}, f)
+        
+        db_engine.reset_engine()
+        db.init_db() # Create tables in new DB
+        
+        return {"status": "success", "message": "Configuration saved and engine restarted."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/admin/db/export")
+async def export_db(current_user: Dict = Depends(verify_token)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    import db_engine
+    if not os.path.exists(db_engine.DEFAULT_SQLITE_PATH):
+        raise HTTPException(status_code=404, detail="SQLite database file not found")
+        
+    return FileResponse(
+        db_engine.DEFAULT_SQLITE_PATH, 
+        filename="batches_backup.db",
+        media_type="application/x-sqlite3"
+    )
+
+@app.post("/api/admin/db/import")
+async def import_db(file: UploadFile = File(...), current_user: Dict = Depends(verify_token)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    import db_engine
+    content = await file.read()
+    
+    # Save as backup first
+    if os.path.exists(db_engine.DEFAULT_SQLITE_PATH):
+        os.rename(db_engine.DEFAULT_SQLITE_PATH, db_engine.DEFAULT_SQLITE_PATH + ".bak")
+        
+    try:
+        with open(db_engine.DEFAULT_SQLITE_PATH, "wb") as f:
+            f.write(content)
+        
+        db_engine.reset_engine()
+        return {"status": "success", "message": "Database imported successfully"}
+    except Exception as e:
+        if os.path.exists(db_engine.DEFAULT_SQLITE_PATH + ".bak"):
+            os.rename(db_engine.DEFAULT_SQLITE_PATH + ".bak", db_engine.DEFAULT_SQLITE_PATH)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ==================================================

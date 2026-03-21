@@ -15,11 +15,33 @@ function AdminPanel({ token }) {
   const [queueInfo, setQueueInfo] = useState(null);
   const [allBatches, setAllBatches] = useState([]);
   const [signupCode, setSignupCode] = useState('');
+  const [dbConfig, setDbConfig] = useState({ current_url: '', config_file_exists: false });
+  const [testUrl, setTestUrl] = useState('');
+  const [dbTestResult, setDbTestResult] = useState(null);
+  
+  // Separate DB fields
+  const [dbFields, setDbFields] = useState({
+    type: 'mysql',
+    host: '',
+    port: '3306',
+    user: '',
+    pass: '',
+    name: ''
+  });
+
+  // Sync dbFields to testUrl
+  useEffect(() => {
+    const { type, host, port, user, pass, name } = dbFields;
+    if (host && user && pass && name) {
+      const url = `${type === 'mysql' ? 'mysql' : 'postgresql'}://${user}:${pass}@${host}:${port}/${name}`;
+      setTestUrl(url);
+    }
+  }, [dbFields]);
 
   // Auto-refresh data
   useEffect(() => {
     loadAllData();
-    const interval = setInterval(loadAllData, 10000); // Refresh every 10 seconds
+    const interval = setInterval(loadAllData, 30000); // 30 seconds for admin
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -29,19 +51,16 @@ function AdminPanel({ token }) {
     setError('');
 
     try {
-      // Load system health
       await loadSystemHealth();
-
-      // Load queue info
       await loadQueueInfo();
 
-      // Load stats only if admin
       if (token) {
         await loadStats();
         await loadUsers();
         await loadUploadStats();
         await loadAllBatches();
         await loadSignupCode();
+        await loadDbConfig();
       }
     } catch (err) {
       console.error('Error loading admin data:', err);
@@ -138,80 +157,90 @@ function AdminPanel({ token }) {
     }
   };
 
-  const loadSignupCode = async () => {
+  const loadDbConfig = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/signup-code`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/db/config`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        setSignupCode(data.code || '');
+        setDbConfig(data);
+        if (!testUrl && data.current_url) setTestUrl(data.current_url);
       }
     } catch (err) {
-      console.error('Error loading signup code:', err);
+      console.error('Error loading DB config:', err);
     }
   };
 
-  const rotateSignupCode = async () => {
-    if (!window.confirm('Generate a new signup code? New users will need the new code.')) return;
-
+  const testDbConnection = async () => {
+    setDbTestResult({ status: 'testing', message: 'Testing connection...' });
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/signup-code/rotate`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/db/test`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url: testUrl })
       });
-      if (res.ok) {
-        const data = await res.json();
-        setSignupCode(data.code);
-        setSuccess('Signup code rotated successfully');
-        setTimeout(() => setSuccess(''), 3000);
-      }
+      const data = await res.json();
+      setDbTestResult(data);
     } catch (err) {
-      setError('Error rotating signup code: ' + err.message);
+      setDbTestResult({ status: 'error', message: err.message });
     }
   };
 
-  const updateUserLimits = async (userId, limitChange) => {
-    const user = users.find(u => u.id === userId);
-    if (!user) return;
-
-    const newLimit = (user.batch_limit || 50) + limitChange;
-    if (newLimit < 0) return;
-
+  const saveDbConfig = async () => {
+    if (!window.confirm('Save this connection? The application will restart using the new database.')) return;
+    
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/limits?batch_limit=${newLimit}`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetch(`${API_BASE_URL}/api/admin/db/save`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url: testUrl })
       });
-
+      const data = await res.json();
       if (res.ok) {
-        setUsers(users.map(u => u.id === userId ? { ...u, batch_limit: newLimit } : u));
-        setSuccess('User limits updated');
-        setTimeout(() => setSuccess(''), 2000);
-      }
-    } catch (err) {
-      setError('Error updating limits: ' + err.message);
-    }
-  };
-
-  const deleteUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        setSuccess('User deleted successfully');
-        setUsers(users.filter(u => u.id !== userId));
+        setSuccess('Database configuration saved successfully');
+        loadDbConfig();
         setTimeout(() => setSuccess(''), 3000);
       } else {
-        setError('Failed to delete user');
+        setError(data.detail || 'Failed to save DB config');
       }
     } catch (err) {
-      setError('Error deleting user: ' + err.message);
+      setError('Error saving DB config: ' + err.message);
+    }
+  };
+
+  const downloadDbBackup = () => {
+    window.open(`${API_BASE_URL}/api/admin/db/export?token=${token}`, '_blank');
+  };
+
+  const importDbBackup = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!window.confirm('Restore from this file? This will OVERWRITE your current local database.')) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/db/import`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      if (res.ok) {
+        setSuccess('Database restored successfully');
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        setError('Failed to restore database');
+      }
+    } catch (err) {
+      setError('Error importing database: ' + err.message);
     }
   };
 
@@ -272,6 +301,12 @@ function AdminPanel({ token }) {
             onClick={() => setActiveTab('system')}
           >
             ⚙️ System
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'database' ? 'active' : ''}`}
+            onClick={() => setActiveTab('database')}
+          >
+            🗄️ Database
           </button>
         </div>
       </div>
@@ -508,6 +543,109 @@ function AdminPanel({ token }) {
               <li>✅ GZIP compression reduces response size</li>
               <li>✅ Keep-alive timeout prevents premature disconnections</li>
             </ul>
+          </div>
+        </div>
+      )}
+      {/* Database Tab */}
+      {activeTab === 'database' && (
+        <div className="admin-section">
+          <h2>🗄️ Database Management</h2>
+          <div className="db-grid">
+            <div className="db-card">
+              <h3>📦 External Connection</h3>
+              <p className="hint">Connect to an online database (Postgres, MySQL, etc.) to prevent data loss on redeployment.</p>
+              
+              <div className="db-credentials-grid">
+                <div className="form-group">
+                  <label>Type</label>
+                  <select value={dbFields.type} onChange={(e) => setDbFields({...dbFields, type: e.target.value})}>
+                    <option value="mysql">MySQL</option>
+                    <option value="postgresql">PostgreSQL</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Host</label>
+                  <input type="text" value={dbFields.host} onChange={(e) => setDbFields({...dbFields, host: e.target.value})} placeholder="sql302.infinityfree.com" />
+                </div>
+                <div className="form-group">
+                  <label>Port</label>
+                  <input type="text" value={dbFields.port} onChange={(e) => setDbFields({...dbFields, port: e.target.value})} placeholder="3306" />
+                </div>
+                <div className="form-group">
+                  <label>Username</label>
+                  <input type="text" value={dbFields.user} onChange={(e) => setDbFields({...dbFields, user: e.target.value})} placeholder="if0_..." />
+                </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <input type="password" value={dbFields.pass} onChange={(e) => setDbFields({...dbFields, pass: e.target.value})} placeholder="••••••••" />
+                </div>
+                <div className="form-group">
+                  <label>Database Name</label>
+                  <input type="text" value={dbFields.name} onChange={(e) => setDbFields({...dbFields, name: e.target.value})} placeholder="if0_..._db" />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Generated DATABASE_URL (Preview)</label>
+                <input 
+                  type="text" 
+                  value={testUrl} 
+                  onChange={(e) => setTestUrl(e.target.value)}
+                  placeholder="postgresql://user:pass@host:port/dbname"
+                />
+              </div>
+
+              <div className="db-actions">
+                <button className="btn btn-secondary" onClick={testDbConnection}>
+                  Test Connection
+                </button>
+                <button className="btn btn-primary" onClick={saveDbConfig}>
+                  Save & Connect
+                </button>
+              </div>
+
+              {dbTestResult && (
+                <div className={`db-result ${dbTestResult.status}`}>
+                  {dbTestResult.status === 'success' ? '✅ ' : '❌ '}
+                  {dbTestResult.message}
+                </div>
+              )}
+
+              <div className="db-pills">
+                <span className="pill-title">Recommended Free Tiers:</span>
+                <a href="https://neon.tech" target="_blank" rel="noreferrer" className="pill">Neon.tech (PG)</a>
+                <a href="https://supabase.com" target="_blank" rel="noreferrer" className="pill">Supabase (PG)</a>
+              </div>
+              
+              <div className="info-box warning">
+                <strong>⚠️ Note:</strong> After saving, the app will restart and re-initialize tables in the new database.
+              </div>
+            </div>
+
+            <div className="db-card">
+              <h3>💾 Local Backup & Restore</h3>
+              <p className="hint">Manually download the SQLite database or restore it from a backup file.</p>
+              
+              <div className="db-actions migration">
+                <button className="btn btn-secondary" onClick={downloadDbBackup}>
+                  📥 Download Backup
+                </button>
+                <div className="file-upload-btn">
+                  <span>📤 Restore from File</span>
+                  <input type="file" accept=".db" onChange={importDbBackup} title=" " />
+                </div>
+              </div>
+
+              <div className="info-box">
+                <strong>💡 Tip:</strong> Use this to migrate data from your local SQLite to another instance if you're not using an online DB yet.
+              </div>
+            </div>
+          </div>
+
+          <div className="db-current-status">
+            <h3>Current Configuration</h3>
+            <p>Active URL: <code>{dbConfig.current_url || 'Detecting...'}</code></p>
+            <p>Local Config File: <strong>{dbConfig.config_file_exists ? '✅ Exists' : '❌ Not Found (Environment Only)'}</strong></p>
           </div>
         </div>
       )}

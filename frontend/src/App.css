@@ -1898,8 +1898,12 @@ body {
 }
 
 @media (max-width: 600px) {
+  .navbar-logo {
+    height: 80px;
+  }
+
   .navbar-brand h1 {
-    display: none;
+    font-size: 1.2rem;
   }
 
   .stats {
@@ -1910,13 +1914,15 @@ body {
 
   .btn {
     padding: 8px 12px;
-    font-size: 12px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
   }
 
   .user-info {
-    padding: 0.5rem 1rem;
+    padding: 0.4rem 0.8rem;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.2rem;
+    font-size: 0.8rem;
   }
 
   .batch-grid {
