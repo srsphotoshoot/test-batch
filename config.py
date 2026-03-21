@@ -35,7 +35,7 @@ GEMINI_API_KEY = os.getenv("SRS_KEY")
 if not GEMINI_API_KEY:
     import sys
     print("⚠️  WARNING: SRS_KEY environment variable not set!", file=sys.stderr)
-MODEL_NAME = "gemini-3-pro-image-preview"
+MODEL_NAME = "gemini-3.1-flash-image-preview"
 
 # Signup Configuration
 SIGNUP_PASSKEY = os.getenv("SIGNUP_PASSKEY")

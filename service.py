@@ -58,12 +58,32 @@ def pil_to_part(img):
 
 def extract_image(resp):
     try:
-        for cand in getattr(resp, "candidates", []):
-            for part in cand.content.parts:
+        candidates = getattr(resp, 'candidates', [])
+        logger.info(f"Full Gemini response cand count: {len(candidates)}")
+        for i, cand in enumerate(candidates):
+            logger.info(f"Candidate {i} finish_reason: {getattr(cand, 'finish_reason', 'UNKNOWN')}")
+            content = getattr(cand, 'content', None)
+            if not content:
+                logger.info(f"Candidate {i} has NO content")
+                continue
+                
+            parts = getattr(content, 'parts', [])
+            if parts is None:
+                logger.info(f"Candidate {i} content parts is NONE")
+                continue
+                
+            logger.info(f"Candidate {i} parts count: {len(parts)}")
+            for j, part in enumerate(parts):
                 inline = getattr(part, "inline_data", None)
-                if inline and inline.mime_type.startswith("image/"):
-                    return base64.b64decode(inline.data) if isinstance(inline.data, str) else inline.data
-    except: pass
+                text = getattr(part, "text", None)
+                if inline:
+                    logger.info(f"Part {j} has inline_data: {inline.mime_type}")
+                    if inline.mime_type.startswith("image/"):
+                        return base64.b64decode(inline.data) if isinstance(inline.data, str) else inline.data
+                if text:
+                    logger.info(f"Part {j} has text: {text[:100]}...")
+    except Exception as e:
+        logger.error(f"Error in extract_image: {str(e)}", exc_info=True)
     return None
 
 def build_prompt(batch):
