@@ -108,14 +108,19 @@ def init_db():
                     )
 
             # Ensure initial admin user exists
-            admin_user = conn.execute("SELECT id FROM users WHERE role = 'admin' LIMIT 1").fetchone()
-            if not admin_user and ADMIN_EMAIL and ADMIN_PASSWORD:
+            admin_user = conn.execute("SELECT id FROM users WHERE email = ?", (ADMIN_EMAIL,)).fetchone()
+            if not admin_user:
                 hashed_pw = bcrypt.hashpw(ADMIN_PASSWORD.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                 conn.execute(
                     "INSERT INTO users (email, password, first_name, last_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                     (ADMIN_EMAIL, hashed_pw, "Admin", "User", "admin", datetime.utcnow().isoformat())
                 )
                 print(f"✅ Initial admin user created: {ADMIN_EMAIL}")
+            else:
+                # Update password for existing admin to match request
+                hashed_pw = bcrypt.hashpw(ADMIN_PASSWORD.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                conn.execute("UPDATE users SET password = ? WHERE email = ?", (hashed_pw, ADMIN_EMAIL))
+                print(f"✅ Admin password updated for: {ADMIN_EMAIL}")
 
             conn.commit()
         except Exception as e:

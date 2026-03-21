@@ -51,7 +51,7 @@ if not JWT_SECRET_KEY:
 
 # Admin Configuration
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@srs.ai")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "srsadmin123")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Srs@2025")
 
 # Image Configuration
 MAX_IMAGE_DIM = 2048
