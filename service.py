@@ -220,3 +220,11 @@ async def start_queue_worker():
             await process_batch_worker(batch_id)
         else:
             await asyncio.sleep(2)
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(start_queue_worker())
+    except KeyboardInterrupt:
+        logger.info("Worker stopped by user")
+    except Exception as e:
+        logger.error(f"Fatal worker error: {str(e)}")

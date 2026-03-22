@@ -69,6 +69,7 @@ import React, { useState } from 'react';
 
 const BatchList = ({ batches, onSelectBatch, userRole, token, apiBaseUrl, onBatchDeleted }) => {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [generatingId, setGeneratingId] = useState(null);
 
   const handleDelete = async (e, batchId) => {
     e.stopPropagation(); // Prevents opening the batch
@@ -83,6 +84,29 @@ const BatchList = ({ batches, onSelectBatch, userRole, token, apiBaseUrl, onBatc
       }
     } catch (err) {
       console.error('Error deleting batch:', err);
+    }
+  };
+
+  const handleGenerate = async (e, batchId) => {
+    e.stopPropagation();
+    setGeneratingId(batchId);
+    
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/batch/${batchId}/generate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        if (onBatchDeleted) onBatchDeleted(); // Silent refresh
+      } else {
+        const data = await res.json();
+        alert('Failed to generate: ' + (data.detail || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Error starting generation:', err);
+      alert('Error starting generation: ' + err.message);
+    } finally {
+      setGeneratingId(null);
     }
   };
 
@@ -149,46 +173,48 @@ const BatchList = ({ batches, onSelectBatch, userRole, token, apiBaseUrl, onBatc
             >
 
               <div className="batch-header">
-                <div className="batch-title-group">
-                  <h3>{batch.output_name}</h3>
-                  {userRole === 'admin' && (
-                    <div className="card-delete-container">
-                      {confirmDeleteId === batch.id ? (
-                        <div className="card-confirm-overlay" onClick={(e) => e.stopPropagation()}>
-                          <button 
-                            className="btn btn-sm btn-danger btn-solid-red"
-                            onClick={(e) => {
-                              handleDelete(e, batch.id);
-                              setConfirmDeleteId(null);
-                            }}
-                          >
-                            CONFIRM?
-                          </button>
-                          <button 
-                            className="btn btn-sm btn-secondary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setConfirmDeleteId(null);
-                            }}
-                          >
-                            X
-                          </button>
-                        </div>
-                      ) : (
+                  <div className="batch-title-group">
+                    <h3>{batch.output_name}</h3>
+                    <div className="card-actions-row">
+                      {(batch.status === 'pending' || batch.status === 'failed' || batch.status === 'error') && (
                         <button 
-                          className="delete-card-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setConfirmDeleteId(batch.id);
-                          }}
-                          title="Delete Batch Permanently"
+                          className={`btn btn-sm btn-generate-card ${generatingId === batch.id ? 'loading' : ''}`}
+                          onClick={(e) => handleGenerate(e, batch.id)}
+                          disabled={generatingId === batch.id}
                         >
-                          🗑️
+                          {generatingId === batch.id ? '⚙️...' : '🚀 Generate'}
                         </button>
                       )}
+                      {userRole === 'admin' && (
+                        <div className="card-delete-container">
+                          {confirmDeleteId === batch.id ? (
+                            <div className="card-confirm-overlay" onClick={(e) => e.stopPropagation()}>
+                              <button 
+                                className="btn btn-sm btn-danger btn-solid-red"
+                                onClick={(e) => {
+                                  handleDelete(e, batch.id);
+                                  setConfirmDeleteId(null);
+                                }}
+                              >
+                                CONFIRM?
+                              </button>
+                            </div>
+                          ) : (
+                            <button 
+                              className="delete-card-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(batch.id);
+                              }}
+                              title="Delete Batch Permanently"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
                 <span
                   className="status-badge"
                   style={{ backgroundColor: getStatusColor(batch.status) }}
