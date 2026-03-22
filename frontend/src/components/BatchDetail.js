@@ -4,7 +4,8 @@ import { compressImage } from '../utils/imageUtils';
 const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
   const [batch, setBatch] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingRoles, setUploadingRoles] = useState({ main: false, ref1: false, ref2: false });
+  const [localPreviews, setLocalPreviews] = useState({ main: null, ref1: null, ref2: null });
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
@@ -33,16 +34,23 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
   const handleImageUpload = async (role, file) => {
     if (!file) return;
 
-    setUploading(true);
+    // 1. Instant Local Preview
+    const localUrl = URL.createObjectURL(file);
+    setLocalPreviews(prev => ({ ...prev, [role]: localUrl }));
+    setUploadingRoles(prev => ({ ...prev, [role]: true }));
     setUploadProgress(prev => ({ ...prev, [role]: 0 }));
 
     try {
-      // 1. Client-side compression
-      console.log(`original size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      // 2. Client-side compression
+      console.log(`[${role}] Original size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
       const compressedBlob = await compressImage(file, 2048, 0.85);
-      console.log(`compressed size: ${(compressedBlob.size / 1024 / 1024).toFixed(2)}MB`);
+      console.log(`[${role}] Compressed size: ${(compressedBlob.size / 1024 / 1024).toFixed(2)}MB`);
 
-      // 2. Upload with Progress via XHR
+      // Update local preview with compressed one if possible
+      const compressedUrl = URL.createObjectURL(compressedBlob);
+      setLocalPreviews(prev => ({ ...prev, [role]: compressedUrl }));
+
+      // 3. Upload with Progress via XHR
       const formData = new FormData();
       formData.append('file', compressedBlob, file.name);
 
@@ -60,30 +68,41 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
         if (xhr.status >= 200 && xhr.status < 300) {
           console.log(`✅ Upload complete for ${role}`);
           setUploadProgress(prev => ({ ...prev, [role]: 100 }));
-          // Give a small delay for the user to see 100% before reloading
-          setTimeout(() => {
-            loadBatchDetail();
-            setUploading(false);
-          }, 500);
+          
+          // Optimistic update of local batch state
+          setBatch(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              [`has_${role}`]: true
+            };
+          });
+
+          // Reload background data
+          loadBatchDetail();
+          setUploadingRoles(prev => ({ ...prev, [role]: false }));
         } else {
-          console.error('Upload failed:', xhr.responseText);
-          alert('Upload failed: ' + xhr.responseText);
-          setUploading(false);
+          console.error(`Upload failed for ${role}:`, xhr.responseText);
+          alert(`Upload failed for ${role}: ` + xhr.responseText);
+          setUploadingRoles(prev => ({ ...prev, [role]: false }));
+          setLocalPreviews(prev => ({ ...prev, [role]: null })); // Revert preview on error
         }
       };
 
       xhr.onerror = () => {
-        console.error('XHR Error');
-        alert('Internal network error during upload');
-        setUploading(false);
+        console.error(`XHR Error for ${role}`);
+        alert(`Internal network error during upload of ${role}`);
+        setUploadingRoles(prev => ({ ...prev, [role]: false }));
+        setLocalPreviews(prev => ({ ...prev, [role]: null }));
       };
 
       xhr.send(formData);
 
     } catch (err) {
-      console.error('Error in upload flow:', err);
-      alert('Failed to process image: ' + err.message);
-      setUploading(false);
+      console.error(`Error in upload flow for ${role}:`, err);
+      alert(`Failed to process ${role} image: ` + err.message);
+      setUploadingRoles(prev => ({ ...prev, [role]: false }));
+      setLocalPreviews(prev => ({ ...prev, [role]: null }));
     }
   };
 
@@ -201,8 +220,9 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
             title="Main Image"
             role="main"
             hasImage={batch.has_main}
-            isUploading={uploading}
+            isUploading={uploadingRoles.main}
             uploadProgress={uploadProgress.main}
+            localPreview={localPreviews.main}
             onUpload={(file) => handleImageUpload('main', file)}
             onDownload={() => downloadImage('main')}
             apiBaseUrl={apiBaseUrl}
@@ -212,8 +232,9 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
             title="Reference 1"
             role="ref1"
             hasImage={batch.has_ref1}
-            isUploading={uploading}
+            isUploading={uploadingRoles.ref1}
             uploadProgress={uploadProgress.ref1}
+            localPreview={localPreviews.ref1}
             onUpload={(file) => handleImageUpload('ref1', file)}
             onDownload={() => downloadImage('ref1')}
             apiBaseUrl={apiBaseUrl}
@@ -223,8 +244,9 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
             title="Reference 2"
             role="ref2"
             hasImage={batch.has_ref2}
-            isUploading={uploading}
+            isUploading={uploadingRoles.ref2}
             uploadProgress={uploadProgress.ref2}
+            localPreview={localPreviews.ref2}
             onUpload={(file) => handleImageUpload('ref2', file)}
             onDownload={() => downloadImage('ref2')}
             apiBaseUrl={apiBaseUrl}
@@ -271,7 +293,7 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
   );
 };
 
-const ImageUploadCard = ({ title, role, hasImage, isUploading, uploadProgress, onUpload, onDownload, apiBaseUrl, batchId }) => {
+const ImageUploadCard = ({ title, role, hasImage, isUploading, uploadProgress, localPreview, onUpload, onDownload, apiBaseUrl, batchId }) => {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) onUpload(file);
@@ -282,8 +304,8 @@ const ImageUploadCard = ({ title, role, hasImage, isUploading, uploadProgress, o
       <h4>{title}</h4>
 
       <div className="upload-area">
-        {hasImage ? (
-          <ImagePreview apiBaseUrl={apiBaseUrl} batchId={batchId} role={role} />
+        {hasImage || localPreview ? (
+          <ImagePreview apiBaseUrl={apiBaseUrl} batchId={batchId} role={role} localPreview={localPreview} />
         ) : (
           <label className="upload-placeholder">
             <div className="upload-icon">📁</div>
@@ -294,18 +316,18 @@ const ImageUploadCard = ({ title, role, hasImage, isUploading, uploadProgress, o
       </div>
 
       <div className="image-actions">
-        {hasImage && (
+        {(hasImage || localPreview) && (
           <>
             <label className="btn btn-sm btn-secondary">
               Change
               <input type="file" accept="image/*" onChange={handleFileChange} hidden />
             </label>
-            <button className="btn btn-sm btn-primary" onClick={onDownload}>
+            <button className="btn btn-sm btn-primary" onClick={onDownload} disabled={!hasImage}>
               Download
             </button>
           </>
         )}
-        {!hasImage && isUploading && uploadProgress !== undefined && (
+        {isUploading && uploadProgress !== undefined && (
           <div className="upload-progress-container">
             <span className="upload-progress-text">{uploadProgress}% Uploaded</span>
             <div className="upload-progress-bar">
@@ -316,14 +338,18 @@ const ImageUploadCard = ({ title, role, hasImage, isUploading, uploadProgress, o
             </div>
           </div>
         )}
-        {!hasImage && isUploading && uploadProgress === undefined && <div className="uploading-spinner">Waiting...</div>}
+        {!isUploading && hasImage && uploadProgress === 100 && (
+          <div className="upload-success-indicator">
+            <span>✅ Upload Successful</span>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-const ImagePreview = ({ apiBaseUrl, batchId, role }) => {
-  const imageUrl = `${apiBaseUrl}/api/batch/${batchId}/image/${role}/raw?t=${new Date().getTime()}`;
+const ImagePreview = ({ apiBaseUrl, batchId, role, localPreview }) => {
+  const imageUrl = localPreview || `${apiBaseUrl}/api/batch/${batchId}/image/${role}/raw?t=${new Date().getTime()}`;
 
   return (
     <>
@@ -331,8 +357,13 @@ const ImagePreview = ({ apiBaseUrl, batchId, role }) => {
         src={imageUrl} 
         alt={role} 
         className="preview-image" 
+        onLoad={() => {
+          // If it's a local URL, we might want to revoke it later, but for now just show it
+        }}
         onError={(e) => {
-          e.target.style.display = 'none';
+          if (!localPreview) {
+            e.target.style.display = 'none';
+          }
         }}
       />
     </>
