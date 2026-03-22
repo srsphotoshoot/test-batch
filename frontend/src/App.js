@@ -12,11 +12,35 @@ import API_BASE_URL from './api_config';
 
 function App() {
   const [currentView, setCurrentView] = useState(() => {
-    // Switch to sessionStorage: If tab closes, session ends.
-    return sessionStorage.getItem('token') ? 'list' : 'login';
+    const token = sessionStorage.getItem('token');
+    if (!token) return 'login';
+    
+    // Support Deep Linking on Refresh
+    const path = window.location.pathname;
+    if (path.includes('/admin')) return 'admin';
+    if (path.includes('/create')) return 'create';
+    if (path.includes('/batch/')) return 'detail';
+    return 'list';
   });
 
-  const [selectedBatchId, setSelectedBatchId] = useState(null);
+  const [selectedBatchId, setSelectedBatchId] = useState(() => {
+    const path = window.location.pathname;
+    if (path.includes('/batch/')) {
+      return path.split('/batch/')[1].split('/')[0];
+    }
+    return null;
+  });
+
+  // Sync URL with View (for stable Refresh)
+  useEffect(() => {
+    if (currentView === 'list') window.history.pushState({}, '', '/');
+    else if (currentView === 'login') window.history.pushState({}, '', '/login');
+    else if (currentView === 'admin') window.history.pushState({}, '', '/admin');
+    else if (currentView === 'create') window.history.pushState({}, '', '/create');
+    else if (currentView === 'detail' && selectedBatchId) {
+      window.history.pushState({}, '', `/batch/${selectedBatchId}`);
+    }
+  }, [currentView, selectedBatchId]);
   const [batches, setBatches] = useState([]);
   const [config, setConfig] = useState(null);
   const [queueStatus, setQueueStatus] = useState({ queued: 0, generating: 0 });

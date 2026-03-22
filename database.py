@@ -354,20 +354,18 @@ def save_batch_binary(batch_id: str, role: str, binary_data: bytes):
 def get_batch(batch_id: str) -> Optional[Dict]:
     db = SessionLocal()
     try:
-        # Load batch with explicit defer of large blobs to prevent 2-minute delays
+        # Load batch with explicit defer of ONLY the massive binary blobs
         batch = db.query(Batch).filter(Batch.id == batch_id).options(
-            deferred(Batch.images_json),
-            deferred(Batch.generated_image_b64),
-            deferred(Batch.main_image_bin),
-            deferred(Batch.ref1_image_bin),
-            deferred(Batch.ref2_image_bin),
-            deferred(Batch.generated_image_bin)
+            defer(Batch.main_image_bin),
+            defer(Batch.ref1_image_bin),
+            defer(Batch.ref2_image_bin),
+            defer(Batch.generated_image_bin)
         ).first()
         
         if not batch:
             return None
         
-        # Initialize dictionary with metadata only
+        # Initialize dictionary with ALL metadata columns (Critical for UI)
         batch_dict = {
             "id": batch.id,
             "output_name": batch.output_name,
@@ -376,10 +374,14 @@ def get_batch(batch_id: str) -> Optional[Dict]:
             "created_at": batch.created_at,
             "user_id": batch.user_id,
             "dress_type": batch.dress_type,
+            "background": batch.background,
+            "pose": batch.pose,
+            "resolution": batch.resolution,
             "blouse_color": batch.blouse_color,
             "lehenga_color": batch.lehenga_color,
             "dupatta_color": batch.dupatta_color,
-            "aspect_ratio": batch.aspect_ratio
+            "aspect_ratio": batch.aspect_ratio,
+            "generated_image": batch.generated_image_b64
         }
         
         # Add lightweight image info from JSON metadata
@@ -390,15 +392,11 @@ def get_batch(batch_id: str) -> Optional[Dict]:
         except:
             batch_dict["images"] = {"main": None, "ref1": None, "ref2": None}
             
-        # Standardize check for binary availability without loading the whole blob
-        # (Using the images_json metadata as a proxy for main/ref files)
+        # Standardize check for binary availability
         batch_dict["has_main_bin"] = batch_dict["images"].get("main") is not None
         batch_dict["has_ref1_bin"] = batch_dict["images"].get("ref1") is not None
         batch_dict["has_ref2_bin"] = batch_dict["images"].get("ref2") is not None
-        
-        # For generated image, we check if the column is locally loaded (no, it's deferred)
-        # Instead, rely on status or specialized check
-        batch_dict["has_generated_bin"] = batch.status == "completed" or batch.status == "done"
+        batch_dict["has_generated_bin"] = batch.status in ["completed", "done"]
         
         return batch_dict
     finally:
@@ -409,14 +407,14 @@ def list_batches(limit: int = 100) -> List[Dict]:
     """Get all batches - Optimized with explicit defer and limit"""
     db = SessionLocal()
     try:
-        # Use load_only for MAXIMUM speed - only fetch metadata, NEVER binary data
+        # Use defer() for query options (NOT deferred())
         batches = db.query(Batch).options(
-            deferred(Batch.images_json),
-            deferred(Batch.generated_image_b64),
-            deferred(Batch.main_image_bin),
-            deferred(Batch.ref1_image_bin),
-            deferred(Batch.ref2_image_bin),
-            deferred(Batch.generated_image_bin)
+            defer(Batch.images_json),
+            defer(Batch.generated_image_b64),
+            defer(Batch.main_image_bin),
+            defer(Batch.ref1_image_bin),
+            defer(Batch.ref2_image_bin),
+            defer(Batch.generated_image_bin)
         ).order_by(Batch.created_at.desc()).limit(limit).all()
         
         result = []
@@ -457,8 +455,18 @@ def list_user_batches(user_id: int, limit: int = 50) -> List[Dict]:
         
         result = []
         for b in batches:
-            b_dict = {c.name: getattr(b, c.name) for c in b.__table__.columns if not c.name.endswith('_bin') and c.name not in ["images_json", "generated_image_b64"]}
-            result.append(b_dict)
+            result.append({
+                "id": b.id,
+                "output_name": b.output_name,
+                "status": b.status,
+                "created_at": b.created_at,
+                "user_id": b.user_id,
+                "dress_type": b.dress_type,
+                "blouse_color": b.blouse_color,
+                "lehenga_color": b.lehenga_color,
+                "dupatta_color": b.dupatta_color,
+                "aspect_ratio": b.aspect_ratio
+            })
         return result
     except Exception as e:
         print(f"Error listing user batches: {str(e)}")
