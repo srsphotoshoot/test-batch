@@ -58,32 +58,65 @@ def pil_to_part(img):
 
 def extract_image(resp):
     try:
+        # 1. Try standard GenerateContentResponse candidates
         candidates = getattr(resp, 'candidates', [])
         logger.info(f"Full Gemini response cand count: {len(candidates)}")
         for i, cand in enumerate(candidates):
             logger.info(f"Candidate {i} finish_reason: {getattr(cand, 'finish_reason', 'UNKNOWN')}")
             content = getattr(cand, 'content', None)
             if not content:
-                logger.info(f"Candidate {i} has NO content")
                 continue
                 
             parts = getattr(content, 'parts', [])
-            if parts is None:
-                logger.info(f"Candidate {i} content parts is NONE")
+            if not parts:
                 continue
                 
-            logger.info(f"Candidate {i} parts count: {len(parts)}")
             for j, part in enumerate(parts):
+                # Try new genai SDK parts (could be part.inline_data)
                 inline = getattr(part, "inline_data", None)
-                text = getattr(part, "text", None)
                 if inline:
-                    logger.info(f"Part {j} has inline_data: {inline.mime_type}")
-                    if inline.mime_type.startswith("image/"):
-                        return base64.b64decode(inline.data) if isinstance(inline.data, str) else inline.data
-                if text:
-                    logger.info(f"Part {j} has text: {text[:100]}...")
+                    logger.info(f"Part {j} has inline_data: {getattr(inline, 'mime_type', 'unknown')}")
+                    # Handle both base64 string and raw bytes
+                    data = getattr(inline, "data", None)
+                    if data:
+                        return base64.b64decode(data) if isinstance(data, str) else data
+                
+                # Check for other common image attributes in different SDK versions
+                for attr in ['image', 'image_bytes', 'data', 'b64_data']:
+                    val = getattr(part, attr, None)
+                    logger.info(f"Checking part attr '{attr}': {'Found' if val else 'None'}")
+                    if val and isinstance(val, bytes):
+                        return val
+                    elif val and isinstance(val, str) and len(val) > 100:
+                        try:
+                            # Try decoding if it looks like base64
+                            return base64.b64decode(val)
+                        except Exception:
+                            pass
+        
+        # 2. Try Imagen GenerateImagesResponse structure
+        gen_images = getattr(resp, 'generated_images', [])
+        if gen_images:
+            logger.info(f"Found generated_images attribute with {len(gen_images)} items")
+            for img in gen_images:
+                # Sometimes it's img.image.image_bytes
+                if hasattr(img, 'image') and hasattr(img.image, 'image_bytes'):
+                    return img.image.image_bytes
+                # Sometimes it's just img.image_bytes or img.image
+                if hasattr(img, 'image_bytes'):
+                    return img.image_bytes
+                if hasattr(img, 'image') and isinstance(img.image, bytes):
+                    return img.image
+
     except Exception as e:
-        logger.error(f"Error in extract_image: {str(e)}", exc_info=True)
+        logger.error(f"Error in extract_image parsing: {str(e)}", exc_info=True)
+    
+    logger.error("Failed to extract any image data from the response structure.")
+    # Log the full response structure for deep debugging
+    try:
+        logger.error(f"Full Response Structure: {str(resp)}")
+    except:
+        pass
     return None
 
 def build_prompt(batch):
