@@ -8,10 +8,10 @@ const BubbleBackground = () => {
         const ctx = canvas.getContext('2d');
         let animationFrameId;
 
-        // Configuration
-        const bubbleCount = 150; // Increased density
-        const connectionDistance = 120;
-        const mouseDistance = 300; // Increased range
+        // Configuration (Optimized for Extreme Performance)
+        const bubbleCount = 60; // Reduced from 150 to eliminate slowness
+        const connectionDistance = 100;
+        const mouseDistance = 200; 
 
         // Neon Palette
         const colors = [
@@ -65,8 +65,8 @@ const BubbleBackground = () => {
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Constant Upward Drift (Buoyancy) - Reduced speed
-                this.vy -= 0.035; // Was 0.05 (0.75x)
+                // Constant Upward Drift (Buoyancy)
+                this.vy -= 0.02; 
 
                 // Speed Limit
                 const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);

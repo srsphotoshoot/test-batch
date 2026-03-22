@@ -407,8 +407,8 @@ def list_batches(limit: int = 100) -> List[Dict]:
     """Get all batches - Optimized with explicit defer and limit"""
     db = SessionLocal()
     try:
-        # Use defer() for query options (NOT deferred())
-        batches = db.query(Batch).options(
+        # Join with User to get email for Admin Dashboard
+        batches = db.query(Batch, User.email).join(User, Batch.user_id == User.id).options(
             defer(Batch.images_json),
             defer(Batch.generated_image_b64),
             defer(Batch.main_image_bin),
@@ -418,7 +418,7 @@ def list_batches(limit: int = 100) -> List[Dict]:
         ).order_by(Batch.created_at.desc()).limit(limit).all()
         
         result = []
-        for b in batches:
+        for b, email in batches:
             # Manually construct dict to avoid accidental column triggers
             result.append({
                 "id": b.id,
@@ -426,6 +426,7 @@ def list_batches(limit: int = 100) -> List[Dict]:
                 "status": b.status,
                 "created_at": b.created_at,
                 "user_id": b.user_id,
+                "user_email": email,
                 "dress_type": b.dress_type,
                 "blouse_color": b.blouse_color,
                 "lehenga_color": b.lehenga_color,

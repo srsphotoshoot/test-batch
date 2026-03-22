@@ -67,7 +67,26 @@
 
 import React from 'react';
 
-const BatchList = ({ batches, onSelectBatch }) => {
+const BatchList = ({ batches, onSelectBatch, userRole, token, apiBaseUrl, onBatchDeleted }) => {
+  const handleDelete = async (e, batchId) => {
+    e.stopPropagation(); // Prevents opening the batch
+    if (!window.confirm('Delete this batch permanently? This will NOT reduce your batch count.')) return;
+    
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/batch/${batchId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        if (onBatchDeleted) onBatchDeleted();
+      } else {
+        alert('Failed to delete batch');
+      }
+    } catch (err) {
+      console.error('Error deleting batch:', err);
+      alert('Error deleting batch: ' + err.message);
+    }
+  };
 
   const getStatusColor = (status) => {
     switch(status) {
@@ -132,16 +151,24 @@ const BatchList = ({ batches, onSelectBatch }) => {
             >
 
               <div className="batch-header">
-
-                <h3>{batch.output_name}</h3>
-
+                <div className="batch-title-group">
+                  <h3>{batch.output_name}</h3>
+                  {userRole === 'admin' && (
+                    <button 
+                      className="delete-card-btn"
+                      onClick={(e) => handleDelete(e, batch.id)}
+                      title="Delete Batch Permanently"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
                 <span
                   className="status-badge"
                   style={{ backgroundColor: getStatusColor(batch.status) }}
                 >
                   {getStatusIcon(batch.status)} {batch.status}
                 </span>
-
               </div>
 
               <div className="batch-meta">

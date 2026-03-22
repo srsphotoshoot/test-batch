@@ -317,6 +317,25 @@ function AdminPanel({ token }) {
     }
   };
 
+  const deleteBatch = async (batchId) => {
+    if (!window.confirm('Delete this batch permanently? This will NOT reduce the user\'s batch count.')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/batch/${batchId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setSuccess('Batch deleted successfully');
+        setAllBatches(prev => prev.filter(b => b.id !== batchId));
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError('Failed to delete batch');
+      }
+    } catch (err) {
+      setError('Error deleting batch: ' + err.message);
+    }
+  };
+
   const clearUploadCache = async () => {
     if (!window.confirm('Clear all upload cache? This cannot be undone.')) return;
 
@@ -479,18 +498,19 @@ function AdminPanel({ token }) {
           <div className="batches-table">
             <div className="table-header">
               <div className="col-id">Batch ID</div>
+              <div className="col-user">Owner Email</div>
               <div className="col-name">Output Name</div>
               <div className="col-status">Status</div>
               <div className="col-created">Created</div>
-              <div className="col-resolution">Resolution</div>
-              <div className="col-pose">Pose</div>
+              <div className="col-actions">Actions</div>
             </div>
             {allBatches.length === 0 ? (
               <div className="empty-state">No batches found</div>
             ) : (
               allBatches.map(batch => (
                 <div key={batch.id} className="table-row">
-                  <div className="col-id"><small>{batch.id.substring(0, 8)}...</small></div>
+                  <div className="col-id"><small title={batch.id}>{batch.id.substring(0, 8)}...</small></div>
+                  <div className="col-user"><small>{batch.user_email || 'Unknown'}</small></div>
                   <div className="col-name">{batch.output_name}</div>
                   <div className="col-status">
                     <span className={`status-badge status-${batch.status}`}>
@@ -500,8 +520,14 @@ function AdminPanel({ token }) {
                   <div className="col-created">
                     <small>{new Date(batch.created_at).toLocaleDateString()}</small>
                   </div>
-                  <div className="col-resolution">{batch.resolution || 'N/A'}</div>
-                  <div className="col-pose">{batch.pose || 'N/A'}</div>
+                  <div className="col-actions">
+                    <button 
+                      className="btn btn-sm btn-danger"
+                      onClick={() => deleteBatch(batch.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))
             )}

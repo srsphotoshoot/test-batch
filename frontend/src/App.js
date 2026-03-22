@@ -290,6 +290,7 @@ function App() {
               }}
               apiBaseUrl={API_BASE_URL}
               token={token}
+              userRole={user?.role}
               onBatchDeleted={loadBatches}
             />
           </div>
