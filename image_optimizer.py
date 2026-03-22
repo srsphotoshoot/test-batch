@@ -165,6 +165,7 @@ class ImageUploadOptimizer:
             
             return {
                 'b64': b64,
+                'raw_bytes': compressed,
                 'size_original_mb': file_size_mb,
                 'size_compressed_mb': compressed_size_mb,
                 'compression_ratio': compression_ratio,

@@ -7,8 +7,8 @@ import jwt
 from config import JWT_SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, SIGNUP_PASSKEY
 from db_engine import SessionLocal, engine, Base
 
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text, DateTime, LargeBinary
+from sqlalchemy.orm import relationship, deferred, defer
 from sqlalchemy.ext.declarative import declared_attr
 
 # -----------------
@@ -44,8 +44,14 @@ class Batch(Base):
     status = Column(String(50), default="pending")
     error = Column(Text)
     created_at = Column(String(50))
-    images_json = Column(Text)
-    generated_image_b64 = Column(Text)
+    images_json = deferred(Column(Text))
+    generated_image_b64 = deferred(Column(Text))
+    
+    # New binary columns for performance
+    main_image_bin = deferred(Column(LargeBinary))
+    ref1_image_bin = deferred(Column(LargeBinary))
+    ref2_image_bin = deferred(Column(LargeBinary))
+    generated_image_bin = deferred(Column(LargeBinary))
     
     # New columns for exact replication
     blouse_color = Column(String(50), default="#FFFFFF")
@@ -227,7 +233,10 @@ def delete_user(user_id: int):
 # BATCH FUNCTIONS
 # -----------------------
 
-def save_batch(batch_data: Dict):
+def save_batch(batch_data: Dict, raw_images: Dict[str, bytes] = None, raw_generated: bytes = None):
+    """
+    Save or update a batch - now optimized with raw binary storage
+    """
     db = SessionLocal()
     try:
         existing = db.query(Batch).filter(Batch.id == batch_data["id"]).first()
@@ -245,8 +254,21 @@ def save_batch(batch_data: Dict):
             existing.user_id = batch_data.get("user_id")
             existing.status = batch_data["status"]
             existing.error = batch_data.get("error")
-            existing.images_json = json.dumps(batch_data.get("images", {}))
-            existing.generated_image_b64 = batch_data.get("generated_image")
+            
+            # 1. Update Legacy JSON (for old code/legacy data)
+            if "images" in batch_data:
+                existing.images_json = json.dumps(batch_data.get("images", {}))
+            if "generated_image" in batch_data:
+                existing.generated_image_b64 = batch_data.get("generated_image")
+            
+            # 2. Update High-Performance Binary Columns
+            if raw_images:
+                if 'main' in raw_images: existing.main_image_bin = raw_images['main']
+                if 'ref1' in raw_images: existing.ref1_image_bin = raw_images['ref1']
+                if 'ref2' in raw_images: existing.ref2_image_bin = raw_images['ref2']
+            if raw_generated:
+                existing.generated_image_bin = raw_generated
+                
         else:
             # Create new
             new_batch = Batch(
@@ -265,7 +287,13 @@ def save_batch(batch_data: Dict):
                 error=batch_data.get("error"),
                 created_at=batch_data["created_at"],
                 images_json=json.dumps(batch_data.get("images", {})),
-                generated_image_b64=batch_data.get("generated_image")
+                generated_image_b64=batch_data.get("generated_image"),
+                
+                # Initial binary data if provided
+                main_image_bin=raw_images.get('main') if raw_images else None,
+                ref1_image_bin=raw_images.get('ref1') if raw_images else None,
+                ref2_image_bin=raw_images.get('ref2') if raw_images else None,
+                generated_image_bin=raw_generated
             )
             db.add(new_batch)
         db.commit()
@@ -283,13 +311,24 @@ def get_batch(batch_id: str) -> Optional[Dict]:
         if not batch:
             return None
         
-        batch_dict = {c.name: getattr(batch, c.name) for c in batch.__table__.columns}
-        batch_dict["images"] = json.loads(batch.images_json) if batch.images_json else {
-            "main": None,
-            "ref1": None,
-            "ref2": None
-        }
+        batch_dict = {c.name: getattr(batch, c.name) for c in batch.__table__.columns if not c.name.endswith('_bin')}
+        
+        # Load images metadata
+        try:
+            batch_dict["images"] = json.loads(batch.images_json) if batch.images_json else {
+                "main": None, "ref1": None, "ref2": None
+            }
+        except:
+            batch_dict["images"] = {"main": None, "ref1": None, "ref2": None}
+            
         batch_dict["generated_image"] = batch.generated_image_b64
+        
+        # Add flags for binary content availability
+        batch_dict["has_main_bin"] = batch.main_image_bin is not None
+        batch_dict["has_ref1_bin"] = batch.ref1_image_bin is not None
+        batch_dict["has_ref2_bin"] = batch.ref2_image_bin is not None
+        batch_dict["has_generated_bin"] = batch.generated_image_bin is not None
+        
         return batch_dict
     finally:
         db.close()
@@ -298,13 +337,20 @@ def get_batch(batch_id: str) -> Optional[Dict]:
 def list_batches() -> List[Dict]:
     db = SessionLocal()
     try:
-        batches = db.query(Batch).order_by(Batch.created_at.desc()).all()
+        # Explicitly defer all large columns to ensure "Dashboard Slowness" is GONE
+        batches = db.query(Batch).options(
+            defer(Batch.images_json),
+            defer(Batch.generated_image_b64),
+            defer(Batch.main_image_bin),
+            defer(Batch.ref1_image_bin),
+            defer(Batch.ref2_image_bin),
+            defer(Batch.generated_image_bin)
+        ).order_by(Batch.created_at.desc()).all()
+        
         result = []
         for b in batches:
-            b_dict = {c.name: getattr(b, c.name) for c in b.__table__.columns}
-            # Remove large strings for list view
-            if "generated_image_b64" in b_dict: del b_dict["generated_image_b64"]
-            if "images_json" in b_dict: del b_dict["images_json"]
+            # Only include lightweight metadata
+            b_dict = {c.name: getattr(b, c.name) for c in b.__table__.columns if not c.name.endswith('_bin') and c.name not in ["images_json", "generated_image_b64"]}
             result.append(b_dict)
         return result
     finally:
@@ -315,12 +361,18 @@ def list_user_batches(user_id: int) -> List[Dict]:
     """Get batches created by a specific user"""
     db = SessionLocal()
     try:
-        batches = db.query(Batch).filter(Batch.user_id == user_id).order_by(Batch.created_at.desc()).all()
+        batches = db.query(Batch).filter(Batch.user_id == user_id).options(
+            defer(Batch.images_json),
+            defer(Batch.generated_image_b64),
+            defer(Batch.main_image_bin),
+            defer(Batch.ref1_image_bin),
+            defer(Batch.ref2_image_bin),
+            defer(Batch.generated_image_bin)
+        ).order_by(Batch.created_at.desc()).all()
+        
         result = []
         for b in batches:
-            b_dict = {c.name: getattr(b, c.name) for c in b.__table__.columns}
-            if "generated_image_b64" in b_dict: del b_dict["generated_image_b64"]
-            if "images_json" in b_dict: del b_dict["images_json"]
+            b_dict = {c.name: getattr(b, c.name) for c in b.__table__.columns if not c.name.endswith('_bin') and c.name not in ["images_json", "generated_image_b64"]}
             result.append(b_dict)
         return result
     finally:

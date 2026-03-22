@@ -198,10 +198,11 @@ async def process_batch_worker(batch_id):
             if not img_bytes:
                 raise Exception("Failed to extract image from response")
 
+            # Save with both legacy Base64 and high-performance binary
             batch["generated_image"] = base64.b64encode(img_bytes).decode('utf-8')
-            batch["status"] = "done"
-            db.save_batch(batch)
-            logger.info(f"Batch {batch_id} completed successfully")
+            batch["status"] = "completed"
+            db.save_batch(batch, raw_generated=img_bytes)
+            logger.info(f"Batch {batch_id} completed successfully with binary storage")
 
         except Exception as e:
             logger.error(f"Error processing batch {batch_id}: {str(e)}")

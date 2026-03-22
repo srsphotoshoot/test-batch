@@ -896,7 +896,7 @@ async def upload_image(batch_id: str, role: str, file: UploadFile = File(...), r
             "size_compressed_mb": upload_result['size_compressed_mb'],
             "compression_ratio": upload_result['compression_ratio']
         }
-        db.save_batch(batch)
+        db.save_batch(batch, raw_images={role: upload_result['raw_bytes']})
         
         logger.info(
             f"✅ {role} uploaded successfully: "
@@ -933,45 +933,65 @@ async def get_image(batch_id: str, role: str):
 @app.get("/api/batch/{batch_id}/image/{role}/raw")
 async def get_image_raw(batch_id: str, role: str):
     """Serve image as raw binary for better performance"""
-    batch = db.get_batch(batch_id)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Batch not found")
+    # We use a fresh DB session here to fetch the deferred binary column
+    import database as db_mod
+    from db_engine import SessionLocal
+    from database import Batch
     
-    if role not in batch["images"] or batch["images"][role] is None:
-        raise HTTPException(status_code=404, detail=f"Image {role} not found")
-        
+    session = SessionLocal()
     try:
-        b64_data = batch["images"][role]["b64"]
-        # Remove header if present
+        batch = session.query(Batch).filter(Batch.id == batch_id).first()
+        if not batch:
+            raise HTTPException(status_code=404, detail="Batch not found")
+            
+        # Prioritize Binary column for speed (Zero decoding overhead)
+        raw_data = None
+        if role == 'main': raw_data = batch.main_image_bin
+        elif role == 'ref1': raw_data = batch.ref1_image_bin
+        elif role == 'ref2': raw_data = batch.ref2_image_bin
+        
+        if raw_data:
+            return Response(content=raw_data, media_type="image/png")
+            
+        # Fallback to legacy Base64 if binary is missing (for old batches)
+        batch_meta = db_mod.get_batch(batch_id)
+        if role not in batch_meta["images"] or batch_meta["images"][role] is None:
+            raise HTTPException(status_code=404, detail=f"Image {role} not found")
+            
+        b64_data = batch_meta["images"][role]["b64"]
         if "," in b64_data:
             b64_data = b64_data.split(",")[1]
-            
-        image_data = base64.b64decode(b64_data)
-        return Response(content=image_data, media_type="image/png")
-    except Exception as e:
-        logger.error(f"Error decoding image: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to serve image data")
+        
+        return Response(content=base64.b64decode(b64_data), media_type="image/png")
+    finally:
+        session.close()
 
 @app.get("/api/batch/{batch_id}/generated-image/raw")
 async def get_generated_image_raw(batch_id: str):
     """Serve generated image as raw binary"""
-    batch = db.get_batch(batch_id)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Batch not found")
+    from db_engine import SessionLocal
+    from database import Batch
     
-    if batch["generated_image"] is None:
-        raise HTTPException(status_code=404, detail="No generated image yet")
-        
+    session = SessionLocal()
     try:
-        b64_data = batch["generated_image"]
-        if "," in b64_data:
-            b64_data = b64_data.split(",")[1]
+        batch = session.query(Batch).filter(Batch.id == batch_id).first()
+        if not batch:
+            raise HTTPException(status_code=404, detail="Batch not found")
             
-        image_data = base64.b64decode(b64_data)
-        return Response(content=image_data, media_type="image/png")
-    except Exception as e:
-        logger.error(f"Error decoding generated image: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to serve generated image")
+        # Prioritize Binary column
+        if batch.generated_image_bin:
+            return Response(content=batch.generated_image_bin, media_type="image/png")
+            
+        # Fallback to legacy Base64
+        if batch.generated_image_b64:
+            b64_data = batch.generated_image_b64
+            if "," in b64_data:
+                b64_data = b64_data.split(",")[1]
+            return Response(content=base64.b64decode(b64_data), media_type="image/png")
+            
+        raise HTTPException(status_code=404, detail="No generated image yet")
+    finally:
+        session.close()
 
 # ==================================================
 # BATCH PROCESSING
