@@ -23,7 +23,7 @@ import database as db
 import service
 from image_optimizer import ImageUploadOptimizer
 
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, Request, Depends
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, Request, Depends, Response
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -928,16 +928,50 @@ async def get_image(batch_id: str, role: str):
     
     return {"b64": batch["images"][role]["b64"]}
 
-@app.get("/api/batch/{batch_id}/generated-image")
-async def get_generated_image(batch_id: str):
+    return {"b64": batch["generated_image"]}
+    
+@app.get("/api/batch/{batch_id}/image/{role}/raw")
+async def get_image_raw(batch_id: str, role: str):
+    """Serve image as raw binary for better performance"""
+    batch = db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    
+    if role not in batch["images"] or batch["images"][role] is None:
+        raise HTTPException(status_code=404, detail=f"Image {role} not found")
+        
+    try:
+        b64_data = batch["images"][role]["b64"]
+        # Remove header if present
+        if "," in b64_data:
+            b64_data = b64_data.split(",")[1]
+            
+        image_data = base64.b64decode(b64_data)
+        return Response(content=image_data, media_type="image/png")
+    except Exception as e:
+        logger.error(f"Error decoding image: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to serve image data")
+
+@app.get("/api/batch/{batch_id}/generated-image/raw")
+async def get_generated_image_raw(batch_id: str):
+    """Serve generated image as raw binary"""
     batch = db.get_batch(batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
     
     if batch["generated_image"] is None:
         raise HTTPException(status_code=404, detail="No generated image yet")
-    
-    return {"b64": batch["generated_image"]}
+        
+    try:
+        b64_data = batch["generated_image"]
+        if "," in b64_data:
+            b64_data = b64_data.split(",")[1]
+            
+        image_data = base64.b64decode(b64_data)
+        return Response(content=image_data, media_type="image/png")
+    except Exception as e:
+        logger.error(f"Error decoding generated image: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to serve generated image")
 
 # ==================================================
 # BATCH PROCESSING

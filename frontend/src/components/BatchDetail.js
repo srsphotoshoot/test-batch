@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { compressImage } from '../utils/imageUtils';
 
 const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
   const [batch, setBatch] = useState(null);
@@ -27,25 +28,61 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
     }
   };
 
+  const [uploadProgress, setUploadProgress] = useState({}); // { role: percentage }
+
   const handleImageUpload = async (role, file) => {
     if (!file) return;
 
     setUploading(true);
+    setUploadProgress(prev => ({ ...prev, [role]: 0 }));
+
     try {
+      // 1. Client-side compression
+      console.log(`original size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      const compressedBlob = await compressImage(file, 2048, 0.85);
+      console.log(`compressed size: ${(compressedBlob.size / 1024 / 1024).toFixed(2)}MB`);
+
+      // 2. Upload with Progress via XHR
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', compressedBlob, file.name);
 
-      const res = await fetch(
-        `${apiBaseUrl}/api/batch/${batchId}/upload/${role}`,
-        { method: 'POST', body: formData }
-      );
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${apiBaseUrl}/api/batch/${batchId}/upload/${role}`, true);
 
-      if (!res.ok) throw new Error('Upload failed');
-      await loadBatchDetail();
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(prev => ({ ...prev, [role]: percentComplete }));
+        }
+      };
+
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          console.log(`✅ Upload complete for ${role}`);
+          setUploadProgress(prev => ({ ...prev, [role]: 100 }));
+          // Give a small delay for the user to see 100% before reloading
+          setTimeout(() => {
+            loadBatchDetail();
+            setUploading(false);
+          }, 500);
+        } else {
+          console.error('Upload failed:', xhr.responseText);
+          alert('Upload failed: ' + xhr.responseText);
+          setUploading(false);
+        }
+      };
+
+      xhr.onerror = () => {
+        console.error('XHR Error');
+        alert('Internal network error during upload');
+        setUploading(false);
+      };
+
+      xhr.send(formData);
+
     } catch (err) {
-      console.error('Error uploading image:', err);
-      alert('Failed to upload image');
-    } finally {
+      console.error('Error in upload flow:', err);
+      alert('Failed to process image: ' + err.message);
       setUploading(false);
     }
   };
@@ -165,6 +202,7 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
             role="main"
             hasImage={batch.has_main}
             isUploading={uploading}
+            uploadProgress={uploadProgress.main}
             onUpload={(file) => handleImageUpload('main', file)}
             onDownload={() => downloadImage('main')}
             apiBaseUrl={apiBaseUrl}
@@ -175,6 +213,7 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
             role="ref1"
             hasImage={batch.has_ref1}
             isUploading={uploading}
+            uploadProgress={uploadProgress.ref1}
             onUpload={(file) => handleImageUpload('ref1', file)}
             onDownload={() => downloadImage('ref1')}
             apiBaseUrl={apiBaseUrl}
@@ -185,6 +224,7 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
             role="ref2"
             hasImage={batch.has_ref2}
             isUploading={uploading}
+            uploadProgress={uploadProgress.ref2}
             onUpload={(file) => handleImageUpload('ref2', file)}
             onDownload={() => downloadImage('ref2')}
             apiBaseUrl={apiBaseUrl}
@@ -231,7 +271,7 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
   );
 };
 
-const ImageUploadCard = ({ title, role, hasImage, isUploading, onUpload, onDownload, apiBaseUrl, batchId }) => {
+const ImageUploadCard = ({ title, role, hasImage, isUploading, uploadProgress, onUpload, onDownload, apiBaseUrl, batchId }) => {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) onUpload(file);
@@ -265,94 +305,46 @@ const ImageUploadCard = ({ title, role, hasImage, isUploading, onUpload, onDownl
             </button>
           </>
         )}
-        {!hasImage && isUploading && <div className="uploading-spinner">Uploading...</div>}
+        {!hasImage && isUploading && uploadProgress !== undefined && (
+          <div className="upload-progress-container">
+            <span className="upload-progress-text">{uploadProgress}% Uploaded</span>
+            <div className="upload-progress-bar">
+              <div 
+                className="upload-progress-fill" 
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+        {!hasImage && isUploading && uploadProgress === undefined && <div className="uploading-spinner">Waiting...</div>}
       </div>
     </div>
   );
 };
 
 const ImagePreview = ({ apiBaseUrl, batchId, role }) => {
-  const [imageSrc, setImageSrc] = useState(null);
-
-  useEffect(() => {
-    const loadImage = async () => {
-      try {
-        const res = await fetch(`${apiBaseUrl}/api/batch/${batchId}/image/${role}`);
-        const data = await res.json();
-        setImageSrc(`data:image/png;base64,${data.b64}`);
-      } catch (err) {
-        console.error('Error loading image:', err);
-      }
-    };
-    loadImage();
-  }, [apiBaseUrl, batchId, role]);
+  const imageUrl = `${apiBaseUrl}/api/batch/${batchId}/image/${role}/raw?t=${new Date().getTime()}`;
 
   return (
     <>
-      {imageSrc && <img src={imageSrc} alt={role} className="preview-image" />}
+      <img 
+        src={imageUrl} 
+        alt={role} 
+        className="preview-image" 
+        onError={(e) => {
+          e.target.style.display = 'none';
+        }}
+      />
     </>
   );
 };
 
 const GeneratedImagePreview = ({ apiBaseUrl, batchId, onDownload }) => {
-  const [imageSrc, setImageSrc] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const loadImage = async () => {
-      setLoading(true);
-      setError(null);
-      setImageSrc(null);
-
-      try {
-        console.log('📥 Loading generated image for batch:', batchId);
-        const res = await fetch(`${apiBaseUrl}/api/batch/${batchId}/generated-image`);
-
-        if (!res.ok) {
-          throw new Error(`Failed to load: ${res.status}`);
-        }
-
-        const data = await res.json();
-
-        if (!data.b64) {
-          throw new Error('No image data in response');
-        }
-
-        // Verify base64 is valid
-        if (data.b64.length < 100) {
-          throw new Error(`Invalid base64 length: ${data.b64.length}`);
-        }
-
-        const src = `data:image/png;base64,${data.b64}`;
-        console.log('✅ Generated image loaded successfully, size:', data.b64.length);
-        setImageSrc(src);
-      } catch (err) {
-        console.error('❌ Error loading generated image:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadImage();
-  }, [apiBaseUrl, batchId]);
-
-  if (loading) {
-    return <div className="loading">⏳ Loading generated image...</div>;
-  }
-
-  if (error) {
-    return <div className="error">❌ {error}</div>;
-  }
-
-  if (!imageSrc) {
-    return <div className="error">❌ No generated image available</div>;
-  }
+  const imageUrl = `${apiBaseUrl}/api/batch/${batchId}/generated-image/raw?t=${new Date().getTime()}`;
 
   return (
     <div className="generated-preview">
-      <img src={imageSrc} alt="Generated" className="preview-image" />
+      <img src={imageUrl} alt="Generated" className="preview-image" />
       <button className="btn btn-primary" onClick={onDownload}>
         Download Generated Image
       </button>

@@ -516,6 +516,34 @@ body {
   box-shadow: 0 0 10px currentColor;
 }
 
+ /* ==================================================
+   PROGRESS BAR
+   ================================================== */
+.upload-progress-container {
+  margin-top: 1rem;
+  width: 100%;
+}
+.upload-progress-text {
+  font-size: 0.8rem;
+  color: var(--neon-cyan);
+  margin-bottom: 0.5rem;
+  display: block;
+  text-align: right;
+  font-weight: 700;
+}
+.upload-progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.upload-progress-fill {
+  height: 100%;
+  background: var(--neon-cyan);
+  box-shadow: 0 0 10px var(--neon-cyan);
+  transition: width 0.2s ease;
+}
+
 /* Image Indicators */
 .batch-images {
   display: flex;
@@ -2006,4 +2034,31 @@ SIDEBAR
 .app-container {
   flex: 1;
   padding-left: 30px;
+}
+/* ==================================================
+   PROGRESS BAR
+   ================================================== */
+.upload-progress-container {
+  margin-top: 1rem;
+  width: 100%;
+}
+.upload-progress-text {
+  font-size: 0.8rem;
+  color: var(--neon-cyan);
+  margin-bottom: 0.5rem;
+  display: block;
+  text-align: right;
+  font-weight: 700;
+}
+.upload-progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.upload-progress-fill {
+  height: 100%;
+  background: var(--neon-cyan);
+  box-shadow: 0 0 10px var(--neon-cyan);
+  transition: width 0.2s ease;
 }
