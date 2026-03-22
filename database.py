@@ -354,23 +354,51 @@ def save_batch_binary(batch_id: str, role: str, binary_data: bytes):
 def get_batch(batch_id: str) -> Optional[Dict]:
     db = SessionLocal()
     try:
-        batch = db.query(Batch).filter(Batch.id == batch_id).first()
+        # Load batch with explicit defer of large blobs to prevent 2-minute delays
+        batch = db.query(Batch).filter(Batch.id == batch_id).options(
+            deferred(Batch.images_json),
+            deferred(Batch.generated_image_b64),
+            deferred(Batch.main_image_bin),
+            deferred(Batch.ref1_image_bin),
+            deferred(Batch.ref2_image_bin),
+            deferred(Batch.generated_image_bin)
+        ).first()
+        
         if not batch:
             return None
         
-        # AVOID accessing ._bin attributes here as it triggers a load
-        # Use simple flags based on images_json metadata instead
+        # Initialize dictionary with metadata only
+        batch_dict = {
+            "id": batch.id,
+            "output_name": batch.output_name,
+            "status": batch.status,
+            "error": batch.error,
+            "created_at": batch.created_at,
+            "user_id": batch.user_id,
+            "dress_type": batch.dress_type,
+            "blouse_color": batch.blouse_color,
+            "lehenga_color": batch.lehenga_color,
+            "dupatta_color": batch.dupatta_color,
+            "aspect_ratio": batch.aspect_ratio
+        }
+        
+        # Add lightweight image info from JSON metadata
         try:
-            images = json.loads(batch.images_json) if batch.images_json else {}
-            batch_dict["has_main_bin"] = images.get("main") is not None
-            batch_dict["has_ref1_bin"] = images.get("ref1") is not None
-            batch_dict["has_ref2_bin"] = images.get("ref2") is not None
+            batch_dict["images"] = json.loads(batch.images_json) if batch.images_json else {
+                "main": None, "ref1": None, "ref2": None
+            }
         except:
-            batch_dict["has_main_bin"] = False
-            batch_dict["has_ref1_bin"] = False
-            batch_dict["has_ref2_bin"] = False
+            batch_dict["images"] = {"main": None, "ref1": None, "ref2": None}
             
-        batch_dict["has_generated_bin"] = batch.generated_image_bin is not None
+        # Standardize check for binary availability without loading the whole blob
+        # (Using the images_json metadata as a proxy for main/ref files)
+        batch_dict["has_main_bin"] = batch_dict["images"].get("main") is not None
+        batch_dict["has_ref1_bin"] = batch_dict["images"].get("ref1") is not None
+        batch_dict["has_ref2_bin"] = batch_dict["images"].get("ref2") is not None
+        
+        # For generated image, we check if the column is locally loaded (no, it's deferred)
+        # Instead, rely on status or specialized check
+        batch_dict["has_generated_bin"] = batch.status == "completed" or batch.status == "done"
         
         return batch_dict
     finally:
