@@ -115,7 +115,7 @@ function LoginSignup({ onLoginSuccess }) {
         <div className="login-logo">
           <img src="/2.png" alt="SRS Logo" />
         </div>
-        <h2>{isSignup ? '📝 Sign Up' : '🔐 Login'}</h2>
+        <h2>{isSignup ? '📝 Sign Up' : '🔐 Shree Radha Studio (SRS)'}</h2>
 
         {error && <div className="error-message">{error}</div>}
 

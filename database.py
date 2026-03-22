@@ -118,7 +118,8 @@ def init_db():
 # -----------------------
 
 def create_user(email: str, password: str, first_name: str = None, last_name: str = None, role: str = "user"):
-    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    # Optimized rounds=10 for extreme speed (< 5s requirement)
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=10)).decode('utf-8')
     db = SessionLocal()
     try:
         new_user = User(

@@ -41,9 +41,10 @@ const BatchDetail = ({ batchId, apiBaseUrl, onBatchUpdated }) => {
     setUploadProgress(prev => ({ ...prev, [role]: 0 }));
 
     try {
-      // 2. Client-side compression
+      // 2. Client-side compression - Optimized for < 10s Upload Speed
       console.log(`[${role}] Original size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-      const compressedBlob = await compressImage(file, 2048, 0.85);
+      // maxDim 1600, quality 0.7 hits the sweet spot for professional AI generation + instant speed
+      const compressedBlob = await compressImage(file, 1600, 0.7);
       console.log(`[${role}] Compressed size: ${(compressedBlob.size / 1024 / 1024).toFixed(2)}MB`);
 
       // Update local preview with compressed one if possible

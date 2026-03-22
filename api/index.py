@@ -69,9 +69,9 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="SRS Batch Mode API",
-    description="REST API for batch image generation",
-    version="1.0.0",
+    title="Shree Radha Studio (SRS) API",
+    description="REST API for professional batch image generation",
+    version="1.2.0",
     lifespan=lifespan
 )
 
@@ -168,7 +168,7 @@ async def signup(data: SignupRequest):
                 detail="User already exists"
             )
 
-        # Create user
+        # Create user (Hashing is handled inside db.create_user with rounds=10 for speed)
         db.create_user(
             email=data.email, 
             password=data.password, 

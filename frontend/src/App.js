@@ -45,7 +45,7 @@ function App() {
 
     // Events to track user activity
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    
+
     events.forEach(event => {
       document.addEventListener(event, resetTimer);
     });
@@ -184,7 +184,7 @@ function App() {
       <nav className="navbar">
         <div className="navbar-brand">
           <img src="/2.png" alt="SRS Logo" className="navbar-logo" />
-          <h1>🎨 Sunil Real Shots (SRS)</h1>
+          <h1>🎨 Shree Radha Studio (SRS)</h1>
         </div>
 
         <div className="navbar-center">
@@ -333,7 +333,7 @@ function App() {
 
       {/* Footer */}
       <footer className="app-footer">
-        <p>Sunil Real Shots (SRS) | Professional Batch Studio v1.1</p>
+        <p>Shree Radha Studio (SRS) | Professional Batch Studio v1.2</p>
       </footer>
     </div>
   );
