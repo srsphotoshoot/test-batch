@@ -90,15 +90,12 @@ function App() {
 
   useEffect(() => {
     if (currentView !== 'login' && token) {
-      loadConfig();
-      loadBatches();
-      loadQueueStatus();
+      Promise.all([loadConfig(), loadBatches(), loadQueueStatus()]);
     }
 
     const interval = setInterval(() => {
       if (currentView !== 'login' && token) {
-        loadBatches();
-        loadQueueStatus();
+        Promise.all([loadBatches(), loadQueueStatus()]);
       }
     }, 5000);
 

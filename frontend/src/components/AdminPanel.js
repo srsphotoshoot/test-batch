@@ -51,16 +51,21 @@ function AdminPanel({ token }) {
     setError('');
 
     try {
-      await loadSystemHealth();
-      await loadQueueInfo();
+      const p1 = loadSystemHealth();
+      const p2 = loadQueueInfo();
 
       if (token) {
-        await loadStats();
-        await loadUsers();
-        await loadUploadStats();
-        await loadAllBatches();
-        await loadSignupCode();
-        await loadDbConfig();
+        await Promise.all([
+          p1, p2,
+          loadStats(),
+          loadUsers(),
+          loadUploadStats(),
+          loadAllBatches(),
+          loadSignupCode(),
+          loadDbConfig()
+        ]);
+      } else {
+        await Promise.all([p1, p2]);
       }
     } catch (err) {
       console.error('Error loading admin data:', err);
