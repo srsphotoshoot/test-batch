@@ -83,6 +83,7 @@ app.add_middleware(
         "https://test-batch-eta.vercel.app",
         "https://test-batch-production.up.railway.app"
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow all Vercel deployments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
