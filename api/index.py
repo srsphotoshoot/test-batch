@@ -840,7 +840,7 @@ async def list_all_batches(current_user: Dict = Depends(verify_token)):
 # IMAGE UPLOAD (OPTIMIZED)
 # ==================================================
 @app.post("/api/batch/{batch_id}/upload/{role}")
-async def upload_image(batch_id: str, role: str, file: UploadFile = File(...), request: Request = None):
+async def upload_image(batch_id: str, role: str, background_tasks: BackgroundTasks, file: UploadFile = File(...), request: Request = None):
     """
     Optimized image upload endpoint with async processing
     Automatically compresses images and returns progress
@@ -891,7 +891,7 @@ async def upload_image(batch_id: str, role: str, file: UploadFile = File(...), r
         if user_id:
             db.increment_daily_uploads(user_id)
         
-        # Save to batch
+        # Save metadata to batch (Instant UI Feedback)
         batch["images"][role] = {
             "b64": upload_result['b64'],
             "filename": upload_result['filename'],
@@ -900,11 +900,23 @@ async def upload_image(batch_id: str, role: str, file: UploadFile = File(...), r
             "size_compressed_mb": upload_result['size_compressed_mb'],
             "compression_ratio": upload_result['compression_ratio']
         }
-        db.save_batch(batch, raw_images={role: upload_result['raw_bytes']})
+        
+        # 1. Perform a LIGHTWEIGHT sync save (metadata only)
+        # This returns a response to the user almost instantly
+        db.save_batch(batch, raw_images=None)
+        
+        # 2. Perform a HEAVY async save in the background (binary data)
+        # This keeps the UI responsive even if the DB connection is slow
+        background_tasks.add_task(
+            db.save_batch_binary,
+            batch_id,
+            role,
+            upload_result['raw_bytes']
+        )
         
         logger.info(
-            f"✅ {role} uploaded successfully: "
-            f"{upload_result['size_original_mb']:.2f}MB → {upload_result['size_compressed_mb']:.2f}MB"
+            f"✅ {role} metadata saved. Binary upload queued in background. "
+            f"Speedup: Instant response triggered."
         )
         
         return {

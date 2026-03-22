@@ -7,10 +7,13 @@
       "config": { "distDir": "build" }
     }
   ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/$1"
-    }
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "http://test-batch-production.up.railway.app/api/$1" },
+    { "source": "/login", "destination": "/" },
+    { "source": "/signup", "destination": "/" },
+    { "source": "/dashboard", "destination": "/" },
+    { "source": "/batch/(.*)", "destination": "/" },
+    { "source": "/admin", "destination": "/" },
+    { "source": "/(.*)", "destination": "/$1" }
   ]
 }

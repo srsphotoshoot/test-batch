@@ -332,6 +332,24 @@ def save_batch(batch_data: Dict, raw_images: Dict[str, bytes] = None, raw_genera
     finally:
         db.close()
 
+def save_batch_binary(batch_id: str, role: str, binary_data: bytes):
+    """Background task to save heavy binary data without blocking the UI"""
+    db = SessionLocal()
+    try:
+        batch = db.query(Batch).filter(Batch.id == batch_id).first()
+        if batch:
+            if role == 'main': batch.main_image_bin = binary_data
+            elif role == 'ref1': batch.ref1_image_bin = binary_data
+            elif role == 'ref2': batch.ref2_image_bin = binary_data
+            elif role == 'generated': batch.generated_image_bin = binary_data
+            db.commit()
+            print(f"✅ Background BINARY save complete for {batch_id} ({role})")
+    except Exception as e:
+        print(f"❌ Background save failed for {batch_id}: {str(e)}")
+        db.rollback()
+    finally:
+        db.close()
+
 
 def get_batch(batch_id: str) -> Optional[Dict]:
     db = SessionLocal()
@@ -340,22 +358,18 @@ def get_batch(batch_id: str) -> Optional[Dict]:
         if not batch:
             return None
         
-        batch_dict = {c.name: getattr(batch, c.name) for c in batch.__table__.columns if not c.name.endswith('_bin')}
-        
-        # Load images metadata
+        # AVOID accessing ._bin attributes here as it triggers a load
+        # Use simple flags based on images_json metadata instead
         try:
-            batch_dict["images"] = json.loads(batch.images_json) if batch.images_json else {
-                "main": None, "ref1": None, "ref2": None
-            }
+            images = json.loads(batch.images_json) if batch.images_json else {}
+            batch_dict["has_main_bin"] = images.get("main") is not None
+            batch_dict["has_ref1_bin"] = images.get("ref1") is not None
+            batch_dict["has_ref2_bin"] = images.get("ref2") is not None
         except:
-            batch_dict["images"] = {"main": None, "ref1": None, "ref2": None}
+            batch_dict["has_main_bin"] = False
+            batch_dict["has_ref1_bin"] = False
+            batch_dict["has_ref2_bin"] = False
             
-        batch_dict["generated_image"] = batch.generated_image_b64
-        
-        # Add flags for binary content availability
-        batch_dict["has_main_bin"] = batch.main_image_bin is not None
-        batch_dict["has_ref1_bin"] = batch.ref1_image_bin is not None
-        batch_dict["has_ref2_bin"] = batch.ref2_image_bin is not None
         batch_dict["has_generated_bin"] = batch.generated_image_bin is not None
         
         return batch_dict
@@ -367,22 +381,31 @@ def list_batches(limit: int = 100) -> List[Dict]:
     """Get all batches - Optimized with explicit defer and limit"""
     db = SessionLocal()
     try:
-        # Explicitly defer all large columns to ensure "Dashboard Slowness" is GONE
-        # Added LIMIT 100 to ensure the dashboard remains fast as the table grows
+        # Use load_only for MAXIMUM speed - only fetch metadata, NEVER binary data
         batches = db.query(Batch).options(
-            defer(Batch.images_json),
-            defer(Batch.generated_image_b64),
-            defer(Batch.main_image_bin),
-            defer(Batch.ref1_image_bin),
-            defer(Batch.ref2_image_bin),
-            defer(Batch.generated_image_bin)
+            deferred(Batch.images_json),
+            deferred(Batch.generated_image_b64),
+            deferred(Batch.main_image_bin),
+            deferred(Batch.ref1_image_bin),
+            deferred(Batch.ref2_image_bin),
+            deferred(Batch.generated_image_bin)
         ).order_by(Batch.created_at.desc()).limit(limit).all()
         
         result = []
         for b in batches:
-            # Only include lightweight metadata
-            b_dict = {c.name: getattr(b, c.name) for c in b.__table__.columns if not c.name.endswith('_bin') and c.name not in ["images_json", "generated_image_b64"]}
-            result.append(b_dict)
+            # Manually construct dict to avoid accidental column triggers
+            result.append({
+                "id": b.id,
+                "output_name": b.output_name,
+                "status": b.status,
+                "created_at": b.created_at,
+                "user_id": b.user_id,
+                "dress_type": b.dress_type,
+                "blouse_color": b.blouse_color,
+                "lehenga_color": b.lehenga_color,
+                "dupatta_color": b.dupatta_color,
+                "aspect_ratio": b.aspect_ratio
+            })
         return result
     except Exception as e:
         print(f"Error listing batches: {str(e)}")
