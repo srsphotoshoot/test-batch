@@ -80,12 +80,9 @@ const BatchList = ({ batches, onSelectBatch, userRole, token, apiBaseUrl, onBatc
       });
       if (res.ok) {
         if (onBatchDeleted) onBatchDeleted();
-      } else {
-        alert('Failed to delete batch');
       }
     } catch (err) {
       console.error('Error deleting batch:', err);
-      alert('Error deleting batch: ' + err.message);
     }
   };
 

@@ -285,7 +285,7 @@ function AdminPanel({ token }) {
   };
 
   const deleteUser = async (userId) => {
-    if (!window.confirm('Delete this user permanently? This cannot be undone.')) return;
+    // if (!window.confirm('Delete this user permanently? This cannot be undone.')) return;
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
         method: 'DELETE',
@@ -324,7 +324,6 @@ function AdminPanel({ token }) {
   };
 
   const deleteBatch = async (batchId) => {
-    if (!window.confirm('Delete this batch permanently? This will NOT reduce the user\'s batch count.')) return;
     try {
       const res = await fetch(`${API_BASE_URL}/api/batch/${batchId}`, {
         method: 'DELETE',
