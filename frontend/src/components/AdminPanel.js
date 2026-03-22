@@ -18,6 +18,7 @@ function AdminPanel({ token }) {
   const [dbConfig, setDbConfig] = useState({ current_url: '', config_file_exists: false });
   const [testUrl, setTestUrl] = useState('');
   const [dbTestResult, setDbTestResult] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null); // Track which batch is being confirmed
   
   // Separate DB fields
   const [dbFields, setDbFields] = useState({
@@ -40,14 +41,14 @@ function AdminPanel({ token }) {
 
   // Auto-refresh data
   useEffect(() => {
-    loadAllData();
-    const interval = setInterval(loadAllData, 30000); // 30 seconds for admin
+    loadAllData(false); // First load is obvious
+    const interval = setInterval(() => loadAllData(true), 30000); // Silent refresh
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const loadAllData = async () => {
-    setLoading(true);
+  const loadAllData = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError('');
 
     try {
@@ -526,12 +527,32 @@ function AdminPanel({ token }) {
                     <small>{new Date(batch.created_at).toLocaleDateString()}</small>
                   </div>
                   <div className="col-actions">
-                    <button 
-                      className="btn btn-sm btn-danger btn-solid-red"
-                      onClick={() => deleteBatch(batch.id)}
-                    >
-                      🗑️ DELETE
-                    </button>
+                    {confirmDeleteId === batch.id ? (
+                      <div className="inline-confirm">
+                        <button 
+                          className="btn btn-sm btn-danger btn-solid-red"
+                          onClick={() => {
+                            deleteBatch(batch.id);
+                            setConfirmDeleteId(null);
+                          }}
+                        >
+                          CONFIRM?
+                        </button>
+                        <button 
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => setConfirmDeleteId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        className="btn btn-sm btn-danger btn-solid-red"
+                        onClick={() => setConfirmDeleteId(batch.id)}
+                      >
+                        🗑️ DELETE
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

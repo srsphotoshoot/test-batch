@@ -65,12 +65,13 @@
 
 // export default BatchList;
 
-import React from 'react';
+import React, { useState } from 'react';
 
 const BatchList = ({ batches, onSelectBatch, userRole, token, apiBaseUrl, onBatchDeleted }) => {
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
   const handleDelete = async (e, batchId) => {
     e.stopPropagation(); // Prevents opening the batch
-    if (!window.confirm('Delete this batch permanently? This will NOT reduce your batch count.')) return;
     
     try {
       const res = await fetch(`${apiBaseUrl}/api/batch/${batchId}`, {
@@ -154,13 +155,41 @@ const BatchList = ({ batches, onSelectBatch, userRole, token, apiBaseUrl, onBatc
                 <div className="batch-title-group">
                   <h3>{batch.output_name}</h3>
                   {userRole === 'admin' && (
-                    <button 
-                      className="delete-card-btn"
-                      onClick={(e) => handleDelete(e, batch.id)}
-                      title="Delete Batch Permanently"
-                    >
-                      🗑️
-                    </button>
+                    <div className="card-delete-container">
+                      {confirmDeleteId === batch.id ? (
+                        <div className="card-confirm-overlay" onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            className="btn btn-sm btn-danger btn-solid-red"
+                            onClick={(e) => {
+                              handleDelete(e, batch.id);
+                              setConfirmDeleteId(null);
+                            }}
+                          >
+                            CONFIRM?
+                          </button>
+                          <button 
+                            className="btn btn-sm btn-secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDeleteId(null);
+                            }}
+                          >
+                            X
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          className="delete-card-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDeleteId(batch.id);
+                          }}
+                          title="Delete Batch Permanently"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
                 <span
