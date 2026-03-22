@@ -107,20 +107,21 @@ def build_prompt(batch):
         bg_prompt = f"BACKGROUND: {bg_color}."
 
     # Dense shared constraints targeting maximum token efficiency
-    dense_rules = """
+    dense_rules = f"""
 MODEL: Adult Indian female, standard runway posture, studio lighting.
 TASK: Mannequin-to-human projection. 
 CONSTRAINTS (STRICT): Preserve EXACT original garment geometry, seams, embroidery, drape, and patterns. Do NOT redesign, beautify, or hallucinate missing details. Adjust ONLY for natural human anatomy.
-DUPATTA: If present, preserve exact length, placement, and fold. Do not alter drape.
+{DUPATTA_LOCK_PROMPT}
 """
 
     base_p = BASE_PROMPT_MAP.get(dress_type, BASE_PROMPT_MAP["Normal Mode"])
     region_lock = LOCKED_REGION_MAP.get(dress_type, "")
     
+    color_lock = f"COLORS(HEX): Blouse:{blouse_color}, Lehenga:{lehenga_color}, Dupatta:{dupatta_color}."
+    
     if dress_type == "Normal Mode":
         prompt_core = f"{base_p}\n{dense_rules}\n{region_lock}"
     else:
-        color_lock = f"COLORS(HEX): Blouse:{blouse_color}, Lehenga:{lehenga_color}, Dupatta:{dupatta_color}."
         prompt_core = f"{base_p}\n{dense_rules}\n{region_lock}\n{color_lock}"
 
     pose_p = POSE_PROMPTS.get(pose_style, "")

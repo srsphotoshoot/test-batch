@@ -14,10 +14,15 @@ __pycache__/
 
 # Database and Logs
 batches.db
+test_verification.db
 *.sqlite3
+*.db
 *.log
 api.log
 db_config.json
+node_modules/
+dist/
+build/
 
 # Mac OS
 .DS_Store

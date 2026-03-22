@@ -79,7 +79,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -699,6 +699,9 @@ async def create_batch(
     resolution: str = Form(default="2K"),
     aspect_ratio: str = Form(default="1:1"),
     dress_type: str = Form(default="Normal Mode"),
+    blouse_color: str = Form(default="#FFFFFF"),
+    lehenga_color: str = Form(default="#FFFFFF"),
+    dupatta_color: str = Form(default="#FFFFFF"),
     request: Request = None
 ):
     try:
@@ -734,6 +737,9 @@ async def create_batch(
             "resolution": resolution,
             "aspect_ratio": aspect_ratio,
             "dress_type": dress_type,
+            "blouse_color": blouse_color,
+            "lehenga_color": lehenga_color,
+            "dupatta_color": dupatta_color,
             "user_id": user_id,
             "status": "pending",
             "created_at": datetime.utcnow().isoformat(),

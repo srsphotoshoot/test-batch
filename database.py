@@ -47,6 +47,12 @@ class Batch(Base):
     images_json = Column(Text)
     generated_image_b64 = Column(Text)
     
+    # New columns for exact replication
+    blouse_color = Column(String(50), default="#FFFFFF")
+    lehenga_color = Column(String(50), default="#FFFFFF")
+    dupatta_color = Column(String(50), default="#FFFFFF")
+    aspect_ratio = Column(String(50), default="1:1")
+    
     user = relationship("User", back_populates="batches")
 
 class SignupCode(Base):
@@ -232,6 +238,10 @@ def save_batch(batch_data: Dict):
             existing.pose = batch_data.get("pose")
             existing.resolution = batch_data.get("resolution")
             existing.dress_type = batch_data.get("dress_type", "Normal Mode")
+            existing.aspect_ratio = batch_data.get("aspect_ratio", "1:1")
+            existing.blouse_color = batch_data.get("blouse_color", "#FFFFFF")
+            existing.lehenga_color = batch_data.get("lehenga_color", "#FFFFFF")
+            existing.dupatta_color = batch_data.get("dupatta_color", "#FFFFFF")
             existing.user_id = batch_data.get("user_id")
             existing.status = batch_data["status"]
             existing.error = batch_data.get("error")
@@ -246,6 +256,10 @@ def save_batch(batch_data: Dict):
                 pose=batch_data.get("pose"),
                 resolution=batch_data.get("resolution"),
                 dress_type=batch_data.get("dress_type", "Normal Mode"),
+                aspect_ratio=batch_data.get("aspect_ratio", "1:1"),
+                blouse_color=batch_data.get("blouse_color", "#FFFFFF"),
+                lehenga_color=batch_data.get("lehenga_color", "#FFFFFF"),
+                dupatta_color=batch_data.get("dupatta_color", "#FFFFFF"),
                 user_id=batch_data.get("user_id"),
                 status=batch_data["status"],
                 error=batch_data.get("error"),
