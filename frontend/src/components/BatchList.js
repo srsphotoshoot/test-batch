@@ -204,7 +204,8 @@ const BatchList = ({ batches, onSelectBatch, userRole, token, apiBaseUrl, onBatc
                         <button 
                           className={`btn btn-sm btn-generate-card ${generatingId === batch.id ? 'loading' : ''}`}
                           onClick={(e) => handleGenerate(e, batch.id)}
-                          disabled={generatingId === batch.id}
+                          disabled={!batch.has_main || !batch.has_ref1 || !batch.has_ref2 || generatingId === batch.id}
+                          title={(!batch.has_main || !batch.has_ref1 || !batch.has_ref2) ? "Waiting for background image uploads to finish..." : "Generate Image"}
                         >
                           {generatingId === batch.id ? '⚙️...' : '🚀 Generate'}
                         </button>

@@ -409,7 +409,6 @@ def list_batches(limit: int = 100) -> List[Dict]:
     try:
         # Join with User to get email for Admin Dashboard
         batches = db.query(Batch, User.email).join(User, Batch.user_id == User.id).options(
-            defer(Batch.images_json),
             defer(Batch.generated_image_b64),
             defer(Batch.main_image_bin),
             defer(Batch.ref1_image_bin),
@@ -419,7 +418,7 @@ def list_batches(limit: int = 100) -> List[Dict]:
         
         result = []
         for b, email in batches:
-            # Manually construct dict to avoid accidental column triggers
+            img_meta = b.images_json or "{}"
             result.append({
                 "id": b.id,
                 "output_name": b.output_name,
@@ -431,7 +430,11 @@ def list_batches(limit: int = 100) -> List[Dict]:
                 "blouse_color": b.blouse_color,
                 "lehenga_color": b.lehenga_color,
                 "dupatta_color": b.dupatta_color,
-                "aspect_ratio": b.aspect_ratio
+                "aspect_ratio": b.aspect_ratio,
+                "has_main": '"main"' in img_meta,
+                "has_ref1": '"ref1"' in img_meta,
+                "has_ref2": '"ref2"' in img_meta,
+                "has_generated": b.status in ("completed", "done")
             })
         return result
     except Exception as e:
@@ -446,7 +449,6 @@ def list_user_batches(user_id: int, limit: int = 50) -> List[Dict]:
     db = SessionLocal()
     try:
         batches = db.query(Batch).filter(Batch.user_id == user_id).options(
-            defer(Batch.images_json),
             defer(Batch.generated_image_b64),
             defer(Batch.main_image_bin),
             defer(Batch.ref1_image_bin),
@@ -456,6 +458,7 @@ def list_user_batches(user_id: int, limit: int = 50) -> List[Dict]:
         
         result = []
         for b in batches:
+            img_meta = b.images_json or "{}"
             result.append({
                 "id": b.id,
                 "output_name": b.output_name,
@@ -466,7 +469,11 @@ def list_user_batches(user_id: int, limit: int = 50) -> List[Dict]:
                 "blouse_color": b.blouse_color,
                 "lehenga_color": b.lehenga_color,
                 "dupatta_color": b.dupatta_color,
-                "aspect_ratio": b.aspect_ratio
+                "aspect_ratio": b.aspect_ratio,
+                "has_main": '"main"' in img_meta,
+                "has_ref1": '"ref1"' in img_meta,
+                "has_ref2": '"ref2"' in img_meta,
+                "has_generated": b.status in ("completed", "done")
             })
         return result
     except Exception as e:
