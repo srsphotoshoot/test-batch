@@ -10,7 +10,7 @@ function AdminPanel({ token }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [activeTab, setActiveTab] = useState('stats');
+  const [activeTab, setActiveTab] = useState('batches'); // Default to All Batches as requested
   const [systemHealth, setSystemHealth] = useState(null);
   const [queueInfo, setQueueInfo] = useState(null);
   const [allBatches, setAllBatches] = useState([]);
@@ -496,7 +496,7 @@ function AdminPanel({ token }) {
         <div className="admin-section">
           <h2>📋 All Batches ({allBatches.length} batches)</h2>
           <div className="batches-table">
-            <div className="table-header">
+            <div className="table-header admin-batches-header">
               <div className="col-id">Batch ID</div>
               <div className="col-user">Owner Email</div>
               <div className="col-name">Output Name</div>
@@ -508,9 +508,9 @@ function AdminPanel({ token }) {
               <div className="empty-state">No batches found</div>
             ) : (
               allBatches.map(batch => (
-                <div key={batch.id} className="table-row">
-                  <div className="col-id"><small title={batch.id}>{batch.id.substring(0, 8)}...</small></div>
-                  <div className="col-user"><small>{batch.user_email || 'Unknown'}</small></div>
+                <div key={batch.id} className="table-row admin-batches-row">
+                  <div className="col-id"><small title={batch.id}>#{batch.id.substring(0, 8)}</small></div>
+                  <div className="col-user"><strong>{batch.user_email || 'Unknown'}</strong></div>
                   <div className="col-name">{batch.output_name}</div>
                   <div className="col-status">
                     <span className={`status-badge status-${batch.status}`}>
@@ -522,10 +522,10 @@ function AdminPanel({ token }) {
                   </div>
                   <div className="col-actions">
                     <button 
-                      className="btn btn-sm btn-danger"
+                      className="btn btn-sm btn-danger btn-solid-red"
                       onClick={() => deleteBatch(batch.id)}
                     >
-                      Delete
+                      🗑️ DELETE
                     </button>
                   </div>
                 </div>

@@ -2121,3 +2121,34 @@ SIDEBAR
   display: flex;
   justify-content: flex-end;
 }
+
+/* ==================================================
+   ADMIN SOLID BUTTONS & GRID FIX
+   ================================================== */
+.btn-solid-red {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4) !important;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.btn-solid-red:hover {
+  background: #dc2626 !important;
+  transform: scale(1.05) !important;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6) !important;
+}
+
+.admin-batches-header, .admin-batches-row {
+  display: grid !important;
+  grid-template-columns: 100px 1.5fr 1.2fr 100px 100px 120px !important;
+  gap: 15px !important;
+  align-items: center !important;
+}
+
+.admin-batches-row .col-user {
+  color: var(--neon-cyan);
+  font-weight: 600;
+}
