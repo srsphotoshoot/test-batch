@@ -40,9 +40,9 @@ function LoginSignup({ onLoginSuccess }) {
         return;
       }
 
-      // Save token and user data
-      localStorage.setItem('token', data.access_token);
-      localStorage.setItem('user', JSON.stringify({
+      // Save token and user data to sessionStorage (Transient)
+      sessionStorage.setItem('token', data.access_token);
+      sessionStorage.setItem('user', JSON.stringify({
         id: data.user_id,
         email: data.email,
         role: data.role

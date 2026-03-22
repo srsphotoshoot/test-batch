@@ -40,10 +40,10 @@ class Batch(Base):
     pose = Column(String(100))
     resolution = Column(String(50))
     dress_type = Column(String(100), default="Normal Mode")
-    user_id = Column(Integer, ForeignKey("users.id"))
-    status = Column(String(50), default="pending")
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    status = Column(String(50), default="pending", index=True)
     error = Column(Text)
-    created_at = Column(String(50))
+    created_at = Column(String(50), index=True)
     images_json = deferred(Column(Text))
     generated_image_b64 = deferred(Column(Text))
     
@@ -180,6 +180,34 @@ def verify_jwt_token(token: str) -> Optional[Dict]:
         return None
     except jwt.InvalidTokenError:
         return None
+
+
+def get_admin_stats() -> Dict:
+    """Admin: Get high-level system statistics (Optimized)"""
+    db = SessionLocal()
+    try:
+        total_users = db.query(User).count()
+        # get_queue_status is defined later in this file
+        q_status = get_queue_status()
+        
+        # Use direct count queries instead of fetching all objects
+        total_batches = db.query(Batch).count()
+        completed_batches = db.query(Batch).filter(Batch.status.in_(['completed', 'done', 'completed'])).count()
+        failed_batches = db.query(Batch).filter(Batch.status.in_(['error', 'failed'])).count()
+        
+        return {
+            "total_users": total_users,
+            "queued_batches": q_status.get("queued", 0),
+            "generating_batches": q_status.get("generating", 0),
+            "total_batches": total_batches,
+            "completed_batches": completed_batches,
+            "failed_batches": failed_batches
+        }
+    except Exception as e:
+        print(f"Error getting admin stats: {str(e)}")
+        return {}
+    finally:
+        db.close()
 
 
 def get_all_users() -> List[Dict]:
@@ -334,10 +362,12 @@ def get_batch(batch_id: str) -> Optional[Dict]:
         db.close()
 
 
-def list_batches() -> List[Dict]:
+def list_batches(limit: int = 100) -> List[Dict]:
+    """Get all batches - Optimized with explicit defer and limit"""
     db = SessionLocal()
     try:
         # Explicitly defer all large columns to ensure "Dashboard Slowness" is GONE
+        # Added LIMIT 100 to ensure the dashboard remains fast as the table grows
         batches = db.query(Batch).options(
             defer(Batch.images_json),
             defer(Batch.generated_image_b64),
@@ -345,7 +375,7 @@ def list_batches() -> List[Dict]:
             defer(Batch.ref1_image_bin),
             defer(Batch.ref2_image_bin),
             defer(Batch.generated_image_bin)
-        ).order_by(Batch.created_at.desc()).all()
+        ).order_by(Batch.created_at.desc()).limit(limit).all()
         
         result = []
         for b in batches:
@@ -353,12 +383,15 @@ def list_batches() -> List[Dict]:
             b_dict = {c.name: getattr(b, c.name) for c in b.__table__.columns if not c.name.endswith('_bin') and c.name not in ["images_json", "generated_image_b64"]}
             result.append(b_dict)
         return result
+    except Exception as e:
+        print(f"Error listing batches: {str(e)}")
+        return []
     finally:
         db.close()
 
 
-def list_user_batches(user_id: int) -> List[Dict]:
-    """Get batches created by a specific user"""
+def list_user_batches(user_id: int, limit: int = 50) -> List[Dict]:
+    """Get batches for a specific user - Optimized with pagination"""
     db = SessionLocal()
     try:
         batches = db.query(Batch).filter(Batch.user_id == user_id).options(
@@ -368,13 +401,16 @@ def list_user_batches(user_id: int) -> List[Dict]:
             defer(Batch.ref1_image_bin),
             defer(Batch.ref2_image_bin),
             defer(Batch.generated_image_bin)
-        ).order_by(Batch.created_at.desc()).all()
+        ).order_by(Batch.created_at.desc()).limit(limit).all()
         
         result = []
         for b in batches:
             b_dict = {c.name: getattr(b, c.name) for c in b.__table__.columns if not c.name.endswith('_bin') and c.name not in ["images_json", "generated_image_b64"]}
             result.append(b_dict)
         return result
+    except Exception as e:
+        print(f"Error listing user batches: {str(e)}")
+        return []
     finally:
         db.close()
 

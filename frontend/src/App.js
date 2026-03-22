@@ -12,18 +12,57 @@ import API_BASE_URL from './api_config';
 
 function App() {
   const [currentView, setCurrentView] = useState(() => {
-    return localStorage.getItem('token') ? 'list' : 'login';
+    // Switch to sessionStorage: If tab closes, session ends.
+    return sessionStorage.getItem('token') ? 'list' : 'login';
   });
 
   const [selectedBatchId, setSelectedBatchId] = useState(null);
   const [batches, setBatches] = useState([]);
   const [config, setConfig] = useState(null);
   const [queueStatus, setQueueStatus] = useState({ queued: 0, generating: 0 });
-  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [token, setToken] = useState(() => sessionStorage.getItem('token'));
   const [user, setUser] = useState(() => {
-    const stored = localStorage.getItem('user');
+    const stored = sessionStorage.getItem('user');
     return stored ? JSON.parse(stored) : null;
   });
+
+  // ---------------------------------------------------------
+  // 120s INACTIVITY TIMEOUT & TAB CLOSE PROTECTION
+  // ---------------------------------------------------------
+  useEffect(() => {
+    if (!token) return;
+
+    let timeoutId;
+    const TIMEOUT_MS = 120000; // 120 seconds
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        console.log("Inactivity timeout reached (120s). Logging out...");
+        handleLogout();
+      }, TIMEOUT_MS);
+    };
+
+    // Events to track user activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    events.forEach(event => {
+      document.addEventListener(event, resetTimer);
+    });
+
+    // Initial timer start
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => {
+        document.removeEventListener(event, resetTimer);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // ---------------------------------------------------------
 
   useEffect(() => {
     if (currentView !== 'login' && token) {
@@ -102,22 +141,22 @@ function App() {
 
     setToken(token);
     setUser(userData);
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+    // Use sessionStorage for security (Tab Close = Sign Out)
+    sessionStorage.setItem('token', token);
+    sessionStorage.setItem('user', JSON.stringify(userData));
 
     if (userData.role === 'admin') {
       setCurrentView('admin');
     } else {
       setCurrentView('list');
     }
-    console.log('Login successful, user role:', userData.role, 'currentView:', userData.role === 'admin' ? 'admin' : 'list');
   };
 
   const handleLogout = () => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     setCurrentView('login');
   };
 
@@ -145,7 +184,7 @@ function App() {
       <nav className="navbar">
         <div className="navbar-brand">
           <img src="/2.png" alt="SRS Logo" className="navbar-logo" />
-          <h1>🎨 SRS Batch Mode</h1>
+          <h1>🎨 Sunil Real Shots (SRS)</h1>
         </div>
 
         <div className="navbar-center">
@@ -178,7 +217,7 @@ function App() {
       {/* Main Content */}
       <div className="app-container">
         {/* Admin Panel View - More resilient check */}
-        {currentView === 'admin' && (user?.role === 'admin' || localStorage.getItem('user')?.includes('"role":"admin"')) && (
+        {currentView === 'admin' && (user?.role === 'admin' || sessionStorage.getItem('user')?.includes('"role":"admin"')) && (
           <div className="view-container">
             <button
               className="btn btn-secondary"
@@ -294,7 +333,7 @@ function App() {
 
       {/* Footer */}
       <footer className="app-footer">
-        <p>SRS Batch Mode v1.0 | Powered by React + FastAPI</p>
+        <p>Sunil Real Shots (SRS) | Professional Batch Studio v1.1</p>
       </footer>
     </div>
   );
