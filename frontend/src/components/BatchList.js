@@ -110,6 +110,30 @@ const BatchList = ({ batches, onSelectBatch, userRole, token, apiBaseUrl, onBatc
     }
   };
 
+  const handleDownload = async (e, batchId, outputName) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/batch/${batchId}/generated-image/raw`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!res.ok) throw new Error('Failed to fetch image');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${outputName || 'generated_image'}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Download err:', err);
+      alert('Failed to download image: ' + err.message);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch(status) {
       case 'pending': return '#f59e0b';
@@ -183,6 +207,14 @@ const BatchList = ({ batches, onSelectBatch, userRole, token, apiBaseUrl, onBatc
                           disabled={generatingId === batch.id}
                         >
                           {generatingId === batch.id ? '⚙️...' : '🚀 Generate'}
+                        </button>
+                      )}
+                      {batch.status === 'done' && (
+                        <button 
+                          className="btn btn-sm btn-download-card"
+                          onClick={(e) => handleDownload(e, batch.id, batch.output_name)}
+                        >
+                          ⬇️ Download
                         </button>
                       )}
                       {userRole === 'admin' && (

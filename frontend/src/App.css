@@ -2228,3 +2228,32 @@ SIDEBAR
   opacity: 0.8;
   cursor: wait;
 }
+
+/* ==================================================
+   BATCH CARD DOWNLOAD BUTTON
+   ================================================== */
+.btn-download-card {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 20px !important;
+  padding: 6px 16px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.btn-download-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
+  filter: brightness(1.1);
+}
+
+.btn-download-card:active:not(:disabled) {
+  transform: translateY(0);
+}
