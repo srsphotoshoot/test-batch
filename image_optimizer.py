@@ -139,27 +139,34 @@ class ImageUploadOptimizer:
         try:
             file_size_mb = len(file_content) / (1024 * 1024)
             
-            # Get compression settings
-            preset = ImageUploadOptimizer.get_compression_preset(file_size_mb, needs_quality)
-            
-            logger.info(f"📦 Uploading {filename} ({file_size_mb:.2f}MB) - Using {preset} preset")
-            
-            # Compress
-            compressed = await ImageUploadOptimizer.compress_image_async(
-                file_content,
-                target_quality=preset['quality'],
-                max_dim=preset['max_dim'],
-                progress_callback=progress_callback
-            )
-            
-            compressed_size_mb = len(compressed) / (1024 * 1024)
-            compression_ratio = file_size_mb / compressed_size_mb if compressed_size_mb > 0 else 1
+            # FAST PATH: If image is already optimized (under 1MB), skip re-compression
+            # This prevents the 2-minute delays caused by redundant Pillow operations on small server instances
+            if file_size_mb < 1.0:
+                logger.info(f"⚡ {filename} ({file_size_mb:.2f}MB) is already optimized. Bypassing re-compression.")
+                compressed = file_content
+                preset = {"status": "bypassed", "reason": "already_small"}
+                compressed_size_mb = file_size_mb
+                compression_ratio = 1.0
+            else:
+                # Get compression settings
+                preset = ImageUploadOptimizer.get_compression_preset(file_size_mb, needs_quality)
+                logger.info(f"📦 Uploading {filename} ({file_size_mb:.2f}MB) - Using {preset} preset")
+                
+                # Compress
+                compressed = await ImageUploadOptimizer.compress_image_async(
+                    file_content,
+                    target_quality=preset['quality'],
+                    max_dim=preset['max_dim'],
+                    progress_callback=progress_callback
+                )
+                compressed_size_mb = len(compressed) / (1024 * 1024)
+                compression_ratio = file_size_mb / compressed_size_mb if compressed_size_mb > 0 else 1
             
             # Convert to base64
             b64 = base64.b64encode(compressed).decode('utf-8')
             
             logger.info(
-                f"✅ {filename} optimized: {file_size_mb:.2f}MB → {compressed_size_mb:.2f}MB "
+                f"✅ {filename} processed: {file_size_mb:.2f}MB → {compressed_size_mb:.2f}MB "
                 f"({compression_ratio:.1f}x compression)"
             )
             
